@@ -15,6 +15,8 @@ The tweak changes values returned inside selected apps for `UIDevice.name`, `mod
 
 The **iPhone 13 Pro Max** profile additionally returns the model identifier `iPhone14,3` through `sysctlbyname("hw.machine")` and `uname` inside selected apps. DeviceTest shows both values for verification. Fake OFF returns the original API values.
 
+Safari appears in Test Apps and can be selected explicitly. The current hooks affect native API reads in the Safari app process; web pages run in separate WebKit processes and JavaScript fingerprint values are outside this MVP.
+
 Apps such as AIDA64 may read other APIs (for example hardware model via `sysctl`) and may cache results. Selecting an app does not guarantee that every value it displays changes; this MVP covers only the four `UIDevice` methods above.
 
 ## Quick start

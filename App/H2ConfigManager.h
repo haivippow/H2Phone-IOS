@@ -4,6 +4,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 FOUNDATION_EXPORT NSString * const H2ConfigChangedNotification;
 FOUNDATION_EXPORT NSString * const H2TargetBundleID;
+FOUNDATION_EXPORT NSString * const H2SafariBundleID;
 
 @interface H2ConfigManager : NSObject
 + (instancetype)sharedManager;

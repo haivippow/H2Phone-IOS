@@ -27,10 +27,18 @@
         @try {
             NSString *bundleID = [proxy valueForKey:@"applicationIdentifier"];
             NSString *type = [proxy valueForKey:@"applicationType"];
-            if (![bundleID isKindOfClass:NSString.class] || (![type isEqualToString:@"User"] && ![bundleID isEqualToString:H2TargetBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) continue;
+            BOOL allowedSystemApp = [bundleID isEqualToString:H2TargetBundleID] || [bundleID isEqualToString:H2SafariBundleID];
+            if (![bundleID isKindOfClass:NSString.class] || (![type isEqualToString:@"User"] && !allowedSystemApp) || [bundleID isEqualToString:@"com.h2changer.app"]) continue;
             NSString *name = [proxy valueForKey:@"localizedName"];
             [items addObject:@{ @"id": bundleID, @"name": [name isKindOfClass:NSString.class] && name.length ? name : bundleID }];
         } @catch (NSException *exception) { continue; }
+    }
+    BOOL hasSafari = NO;
+    for (NSDictionary *item in items) {
+        if ([item[@"id"] isEqualToString:H2SafariBundleID]) { hasSafari = YES; break; }
+    }
+    if (!hasSafari) {
+        [items addObject:@{ @"id": H2SafariBundleID, @"name": @"Safari" }];
     }
     [items sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) { return [a[@"name"] localizedCaseInsensitiveCompare:b[@"name"]]; }];
     self.apps = items;

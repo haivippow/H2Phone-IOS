@@ -68,6 +68,6 @@ static BOOL H2Profile13ProMax(void) {
 
 %ctor {
     NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
-    if (bundleID.length == 0 || [bundleID hasPrefix:@"com.apple."] || [bundleID isEqualToString:@"com.h2changer.app"]) return;
+    if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return;
     %init;
 }

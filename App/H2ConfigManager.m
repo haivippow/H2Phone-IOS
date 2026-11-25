@@ -3,6 +3,7 @@
 
 NSString * const H2ConfigChangedNotification = @"com.h2changer.config.changed";
 NSString * const H2TargetBundleID = @"com.h2phone.devicetest";
+NSString * const H2SafariBundleID = @"com.apple.mobilesafari";
 static NSString * const H2ConfigPath = @"/var/mobile/Library/Preferences/com.h2changer.config.plist";
 static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2changer.debug.log";
 
@@ -50,7 +51,7 @@ static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2chan
 }
 
 - (BOOL)setAppEnabled:(BOOL)enabled bundleID:(NSString *)bundleID error:(NSError **)error {
-    if (bundleID.length == 0 || [bundleID hasPrefix:@"com.apple."] || [bundleID isEqualToString:@"com.h2changer.app"]) {
+    if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) {
         if (error) *error = [NSError errorWithDomain:@"H2Config" code:2 userInfo:@{NSLocalizedDescriptionKey: @"This app cannot be selected."}];
         return NO;
     }
@@ -66,7 +67,7 @@ static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2chan
 }
 
 - (BOOL)isFakeActiveForBundleID:(NSString *)bundleID {
-    if (bundleID.length == 0 || [bundleID hasPrefix:@"com.apple."] || [bundleID isEqualToString:@"com.h2changer.app"]) return NO;
+    if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return NO;
     NSDictionary *config = [self snapshot];
     return [config[@"enabled"] boolValue] && [config[@"enabledApps"] containsObject:bundleID];
 }
