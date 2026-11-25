@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $required = @(
     'App/main.m', 'App/H2MainController.m', 'Tweak/Tweak.xm',
-    'Tweak/H2ChangerHook.plist', 'Shared/H2ConfigManager.m',
+    'Tweak/H2ChangerHook.plist', 'App/H2ConfigManager.m',
     'DeviceTest/main.m', 'DeviceTest/H2TestController.m',
     'Makefile', 'control', 'README.md', 'docs/build-install.md'
 )

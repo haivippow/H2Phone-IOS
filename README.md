@@ -6,7 +6,7 @@ Native iPhone controller and isolated API test tweak for iPhone XS on iOS 16.1 w
 
 - `App/`: UIKit controller with Dashboard, Test Apps, Profiles, Fake ON/OFF, Restore Original, and Debug Logs.
 - `Tweak/`: Logos hook, filtered to `com.h2phone.devicetest` only.
-- `Shared/`: file-based Config Manager; a future C# agent can write the same schema.
+- `App/H2ConfigManager.*`: file-based Config Manager; a future C# agent can write the same schema.
 - `DeviceTest/`: real UIKit app showing values returned by `UIDevice` APIs.
 - `Scripts/`: local structure verification.
 - `docs/`: build, installation, and architecture notes.
