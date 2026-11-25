@@ -31,7 +31,10 @@ static NSString *H2GestaltValue(CFStringRef key) {
 @property (nonatomic, strong) CLLocationManager *locationManager;
 @property (nonatomic, strong) CMMotionManager *motionManager;
 @property (nonatomic, strong) WKWebView *webProbe;
+@property (nonatomic, strong) WKNavigation *webNavigation;
 @property (nonatomic, copy) NSDictionary<NSString *, NSString *> *webValues;
+@property (nonatomic, copy) NSString *webProbeStatus;
+@property (nonatomic) NSUInteger webProbeGeneration;
 @end
 
 @implementation H2TestController
@@ -48,26 +51,90 @@ static NSString *H2GestaltValue(CFStringRef key) {
     self.motionManager = [CMMotionManager new];
     if (self.motionManager.accelerometerAvailable) [self.motionManager startAccelerometerUpdates];
     if (self.motionManager.deviceMotionAvailable) [self.motionManager startDeviceMotionUpdates];
-    self.webProbe = [[WKWebView alloc] initWithFrame:CGRectMake(0, 0, 1, 1) configuration:[WKWebViewConfiguration new]];
-    self.webProbe.alpha = 0.01;
+    self.webProbe = [[WKWebView alloc] initWithFrame:CGRectMake(0, 0, UIScreen.mainScreen.bounds.size.width, 56) configuration:[WKWebViewConfiguration new]];
     self.webProbe.navigationDelegate = self;
-    [self.view addSubview:self.webProbe];
-    [self.webProbe loadHTMLString:@"<html><body>Web API probe</body></html>" baseURL:nil];
+    self.tableView.tableHeaderView = self.webProbe;
+    [self beginWebProbe];
     [self refreshValues];
 }
 
 - (void)refreshAll {
     [self refreshValues];
-    [self.webProbe reload];
+    [self beginWebProbe];
+}
+
+- (void)beginWebProbe {
+    self.webProbeGeneration++;
+    NSUInteger generation = self.webProbeGeneration;
+    self.webProbeStatus = @"Loading WebKit page";
+    self.webValues = @{ @"ua": @"(loading)", @"appVersion": @"(loading)", @"language": @"(loading)", @"timezone": @"(loading)", @"canvas": @"(loading)" };
+    self.webNavigation = [self.webProbe loadHTMLString:@"<html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='font:14px -apple-system;padding:4px'>WebKit API probe</body></html>" baseURL:nil];
+    [self refreshValues];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (generation != self.webProbeGeneration) return;
+        if ([self.webProbeStatus isEqualToString:@"Loading WebKit page"]) {
+            self.webProbeStatus = @"WebKit timeout: no navigation callback";
+            [self setWebProbeError:self.webProbeStatus];
+        } else {
+            NSMutableDictionary *updated = [self.webValues mutableCopy];
+            BOOL timedOut = NO;
+            for (NSString *key in @[@"ua", @"appVersion", @"language", @"timezone", @"canvas"]) {
+                if ([updated[key] isEqualToString:@"(loading)"]) {
+                    updated[key] = @"(JavaScript timeout)";
+                    timedOut = YES;
+                }
+            }
+            if (timedOut) {
+                self.webProbeStatus = @"WebKit loaded; JavaScript timeout";
+                self.webValues = updated;
+                [self refreshValues];
+            }
+        }
+    });
+}
+
+- (void)setWebProbeError:(NSString *)message {
+    self.webValues = @{ @"ua": message, @"appVersion": message, @"language": message, @"timezone": message, @"canvas": message };
+    [self refreshValues];
+}
+
+- (void)runWebScript:(NSString *)script key:(NSString *)key {
+    NSUInteger generation = self.webProbeGeneration;
+    [self.webProbe evaluateJavaScript:script completionHandler:^(id value, NSError *error) {
+        if (generation != self.webProbeGeneration) return;
+        NSMutableDictionary *updated = [self.webValues mutableCopy] ?: [NSMutableDictionary dictionary];
+        updated[key] = error ? error.localizedDescription : ([value description] ?: @"(nil)");
+        self.webValues = updated;
+        [self refreshValues];
+    }];
 }
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
-    NSString *script = @"(function(){var c=document.createElement('canvas');c.width=200;c.height=40;var x=c.getContext('2d');x.font='16px Arial';x.fillText('H2Canvas',8,24);var s=c.toDataURL();var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return {ua:navigator.userAgent,language:navigator.language,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,canvas:(h>>>0).toString(16)};})()";
-    [webView evaluateJavaScript:script completionHandler:^(id value, NSError *error) {
-        if ([value isKindOfClass:NSDictionary.class]) self.webValues = value;
-        else self.webValues = @{ @"ua": error.localizedDescription ?: @"(unavailable)" };
-        [self refreshValues];
-    }];
+    if (self.webNavigation && navigation != self.webNavigation) return;
+    self.webProbeStatus = @"WebKit loaded";
+    [self runWebScript:@"navigator.userAgent" key:@"ua"];
+    [self runWebScript:@"navigator.appVersion" key:@"appVersion"];
+    [self runWebScript:@"navigator.language" key:@"language"];
+    [self runWebScript:@"Intl.DateTimeFormat().resolvedOptions().timeZone" key:@"timezone"];
+    [self runWebScript:@"(function(){var c=document.createElement('canvas');c.width=200;c.height=40;var x=c.getContext('2d');x.font='16px Arial';x.fillText('H2Canvas',8,24);var s=c.toDataURL();var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);})()" key:@"canvas"];
+    [self refreshValues];
+}
+
+- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error {
+    if (self.webNavigation && navigation != self.webNavigation) return;
+    self.webProbeStatus = [@"WebKit load failed: " stringByAppendingString:error.localizedDescription];
+    [self setWebProbeError:self.webProbeStatus];
+}
+
+- (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
+    if (self.webNavigation && navigation != self.webNavigation) return;
+    self.webProbeStatus = [@"WebKit start failed: " stringByAppendingString:error.localizedDescription];
+    [self setWebProbeError:self.webProbeStatus];
+}
+
+- (void)webViewWebContentProcessDidTerminate:(WKWebView *)webView {
+    self.webProbeStatus = @"WebKit content process terminated";
+    [self setWebProbeError:self.webProbeStatus];
 }
 
 - (void)dealloc {
@@ -113,7 +180,9 @@ static NSString *H2GestaltValue(CFStringRef key) {
         @[@"Radio", [CTTelephonyNetworkInfo new].currentRadioAccessTechnology ?: @"(unavailable)"],
         @[@"Battery", device.batteryLevel >= 0 ? [NSString stringWithFormat:@"%.0f%%", device.batteryLevel * 100] : @"(unavailable)"],
         @[@"Accelerometer", motion],
+        @[@"WebKit probe", self.webProbeStatus ?: @"(starting)"],
         @[@"Web UA (JavaScript)", self.webValues[@"ua"] ?: @"(loading)"],
+        @[@"Web appVersion", self.webValues[@"appVersion"] ?: @"(loading)"],
         @[@"Web language", self.webValues[@"language"] ?: @"(loading)"],
         @[@"Web time zone", self.webValues[@"timezone"] ?: @"(loading)"],
         @[@"Canvas hash", self.webValues[@"canvas"] ?: @"(loading)"]

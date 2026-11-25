@@ -14,6 +14,7 @@ static NSString *H2Script(NSString *userAgent, NSUInteger seed) {
     @"Object.defineProperty(o,k,{configurable:true,enumerable:d.enumerable,get:function(){"
     @"return s.enabled?f():d.get?d.get.call(this):d.value;}});}"
     @"prop(Navigator.prototype,'userAgent',function(){return s.userAgent;});"
+    @"prop(Navigator.prototype,'appVersion',function(){return s.userAgent.slice(8);});"
     @"prop(Navigator.prototype,'language',function(){return 'vi-VN';});"
     @"prop(Navigator.prototype,'languages',function(){return ['vi-VN','en-US'];});"
     @"prop(Navigator.prototype,'platform',function(){return 'iPhone';});"

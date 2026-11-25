@@ -23,6 +23,10 @@ Version 0.1.10 adds selected-app hooks for IDFA (only when ATT already exposes a
 
 Version 0.1.11 adds synthetic primary/secondary IMEI responses for the MobileGestalt API inside selected apps, plus experimental JavaScript language/time-zone/User-Agent and Canvas readout overrides in selected apps' `WKWebView` pages. DeviceTest reads the IMEI keys and shows additional native/WebKit API values for comparison. These changes do not alter the modem IMEI and do not cover every browser fingerprint surface.
 
+Version 0.1.12 replaces the tiny background DeviceTest WebKit probe with a visible table header and shows navigation, JavaScript, process termination, or timeout errors per row.
+
+Version 0.1.12 also aligns `navigator.appVersion` with the selected iOS profile and sets the top-level WebKit request's User-Agent header. These affect values reported to websites, not the installed Safari/WebKit engine; a website can still detect iOS 16.1 through engine behavior.
+
 ## Quick start
 
 Run setup and build commands using [docs/build-install.md](docs/build-install.md). On WSL2 Ubuntu 24.04, run `bash Scripts/build.sh`. A rootless `.deb` has been built in `packages/`; installation and behavior on an iPhone have not yet been tested.

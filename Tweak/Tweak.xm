@@ -284,6 +284,12 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
 
 - (WKNavigation *)loadRequest:(NSURLRequest *)request {
     H2ApplyWebUserAgent(self);
+    NSString *scheme = request.URL.scheme.lowercaseString;
+    if (H2FakeEnabled() && ([@"https" isEqualToString:scheme] || [@"http" isEqualToString:scheme])) {
+        NSMutableURLRequest *fakeRequest = [request mutableCopy];
+        [fakeRequest setValue:H2WebUserAgent() forHTTPHeaderField:@"User-Agent"];
+        return %orig(fakeRequest);
+    }
     return %orig;
 }
 
