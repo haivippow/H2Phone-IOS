@@ -1,0 +1,68 @@
+#import "H2ConfigManager.h"
+#import <notify.h>
+
+NSString * const H2ConfigChangedNotification = @"com.h2changer.config.changed";
+NSString * const H2TargetBundleID = @"com.h2phone.devicetest";
+static NSString * const H2ConfigPath = @"/var/mobile/Library/Preferences/com.h2changer.config.plist";
+static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2changer.debug.log";
+
+@implementation H2ConfigManager
+
++ (instancetype)sharedManager {
+    static H2ConfigManager *manager;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ manager = [H2ConfigManager new]; });
+    return manager;
+}
+
+- (NSDictionary<NSString *, id> *)snapshot {
+    NSDictionary *value = [NSDictionary dictionaryWithContentsOfFile:H2ConfigPath];
+    if (![value isKindOfClass:NSDictionary.class] || ![value[@"schema"] isEqual:@1]) {
+        return @{ @"schema": @1, @"enabled": @(NO), @"profile": @"Test A" };
+    }
+    NSString *profile = value[@"profile"];
+    if (![profile isKindOfClass:NSString.class] || ![@[@"Test A", @"Test B"] containsObject:profile]) profile = @"Test A";
+    return @{ @"schema": @1, @"enabled": @([value[@"enabled"] boolValue]), @"profile": profile };
+}
+
+- (BOOL)saveEnabled:(BOOL)enabled profile:(NSString *)profile error:(NSError **)error {
+    if (![@[@"Test A", @"Test B"] containsObject:profile]) {
+        if (error) *error = [NSError errorWithDomain:@"H2Config" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Unknown profile"}];
+        return NO;
+    }
+    NSDictionary *value = @{ @"schema": @1, @"enabled": @(enabled), @"profile": profile };
+    NSData *data = [NSPropertyListSerialization dataWithPropertyList:value format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
+    if (!data || ![data writeToFile:H2ConfigPath options:NSDataWritingAtomic error:error]) return NO;
+    notify_post(H2ConfigChangedNotification.UTF8String);
+    [self appendLog:[NSString stringWithFormat:@"Config: %@ / %@", enabled ? @"ON" : @"OFF", profile]];
+    return YES;
+}
+
+- (BOOL)restoreOriginal:(NSError **)error {
+    NSDictionary *current = [self snapshot];
+    return [self saveEnabled:NO profile:current[@"profile"] error:error];
+}
+
+- (void)appendLog:(NSString *)message {
+    @synchronized (self) {
+        NSString *line = [NSString stringWithFormat:@"%@ %@\n", [NSDate date], message];
+        NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:H2LogPath];
+        if (!handle) {
+            [line writeToFile:H2LogPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            return;
+        }
+        @try {
+            [handle seekToEndOfFile];
+            [handle writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
+            [handle closeFile];
+        } @catch (NSException *exception) { [handle closeFile]; }
+    }
+}
+
+- (NSArray<NSString *> *)recentLogs {
+    NSString *content = [NSString stringWithContentsOfFile:H2LogPath encoding:NSUTF8StringEncoding error:nil] ?: @"";
+    NSArray *lines = [content componentsSeparatedByString:@"\n"];
+    NSUInteger start = lines.count > 100 ? lines.count - 100 : 0;
+    return [lines subarrayWithRange:NSMakeRange(start, lines.count - start)];
+}
+@end
