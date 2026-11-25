@@ -1,7 +1,6 @@
 #import "H2MainController.h"
 #import "H2ConfigManager.h"
 #import "H2AppListController.h"
-#import "H2BrowserController.h"
 
 @interface H2MainController ()
 @property (nonatomic, strong) UISwitch *fakeSwitch;
@@ -23,10 +22,10 @@
     [self.tableView reloadData];
 }
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 6; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 5; }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return section == 2 ? [H2ConfigManager profiles].count : 1; }
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    return @[@"Dashboard", @"Test Apps", @"Profiles", @"Web Browser", @"Control", @"Debug Logs"][section];
+    return @[@"Dashboard", @"Test Apps", @"Profiles", @"Control", @"Debug Logs"][section];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -49,11 +48,6 @@
             cell.accessoryType = [config[@"profile"] isEqualToString:[H2ConfigManager profiles][indexPath.row][@"name"]] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
             break;
         case 3:
-            cell.textLabel.text = @"Open browser with profile User-Agent";
-            cell.detailTextLabel.text = [config[@"enabled"] boolValue] ? @"Fake UA is ON" : @"Original UA (Fake OFF)";
-            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-            break;
-        case 4:
             cell.textLabel.text = @"Restore Original";
             cell.detailTextLabel.text = @"Turn Fake OFF; real API values return on next read";
             break;
@@ -91,13 +85,11 @@
         if (![H2ConfigManager.sharedManager saveEnabled:enabled profile:profile error:&error]) [self showError:error];
         [self.tableView reloadData];
     } else if (indexPath.section == 3) {
-        [self.navigationController pushViewController:[H2BrowserController new] animated:YES];
-    } else if (indexPath.section == 4) {
         NSError *error;
         if (![H2ConfigManager.sharedManager restoreOriginal:&error]) [self showError:error];
         self.fakeSwitch.on = NO;
         [self.tableView reloadData];
-    } else if (indexPath.section == 5) {
+    } else if (indexPath.section == 4) {
         NSString *logs = [[H2ConfigManager.sharedManager recentLogs] componentsJoinedByString:@"\n"];
         UIViewController *viewer = [UIViewController new];
         viewer.title = @"Debug Logs";

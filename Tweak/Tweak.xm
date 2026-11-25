@@ -147,8 +147,22 @@ static void H2ApplySafariUserAgent(WKWebView *webView) {
     return %orig;
 }
 
+- (WKNavigation *)loadHTMLString:(NSString *)string baseURL:(NSURL *)baseURL {
+    H2ApplySafariUserAgent(self);
+    return %orig;
+}
+
+- (WKNavigation *)reload {
+    H2ApplySafariUserAgent(self);
+    return %orig;
+}
+
 - (void)setCustomUserAgent:(NSString *)userAgent {
-    if (H2SettingSafariUserAgent || !H2FakeEnabled()) return %orig;
+    if (H2SettingSafariUserAgent) return %orig;
+    if (!H2FakeEnabled()) {
+        objc_setAssociatedObject(self, &H2OriginalUserAgentKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return %orig;
+    }
     objc_setAssociatedObject(self, &H2OriginalUserAgentKey, userAgent ?: NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return %orig(H2SafariUserAgent());
 }

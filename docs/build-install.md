@@ -61,7 +61,7 @@ ssh mobile@IPHONE_IP 'sudo dpkg -i /var/mobile/com.h2changer.ios_*.deb && sudo u
 
 If the package filename differs, replace the wildcard with the actual name. Run `uicache -a` after install if the icons are absent. Launch H2Changer, select a profile, open Test Apps and select apps that should read fake values, then turn Fake ON. Tap the info button beside an app to open it. Close and reopen an app if it was already running before the tweak was installed. In DeviceTest, tap Refresh after each change. Turn Fake OFF or tap Restore Original, then refresh again to see original API results.
 
-For Safari User-Agent testing, select Safari in Test Apps, turn Fake ON, then fully close and reopen Safari. Visit an HTTP header echo page and compare its `User-Agent` with `navigator.userAgent` shown by a browser test page. Repeat after Fake OFF. The Safari hook in 0.1.8 is experimental and must be verified on the target iPhone; the separate Web Browser inside H2Changer provides a working `WKWebView.customUserAgent` path for comparison.
+For Safari User-Agent testing, select Safari in Test Apps, turn Fake ON, then fully close and reopen Safari. Visit an HTTP header echo page and compare its `User-Agent` with `navigator.userAgent` shown by a browser test page. Repeat after Fake OFF. The Safari hook in 0.1.9 is experimental and must be verified on the target iPhone.
 
 ## Verification
 
