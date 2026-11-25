@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #import "H2ConfigManager.h"
+#import "H2WebFingerprint.h"
 #import <sys/sysctl.h>
 #import <sys/utsname.h>
 #import <errno.h>
@@ -59,6 +60,9 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
         H2SettingWebUserAgent = NO;
         objc_setAssociatedObject(webView, &H2OriginalUserAgentKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    NSString *board = H2Profile()[@"board"];
+    NSUInteger seed = board.length > 1 ? [board characterAtIndex:1] : 1;
+    H2UpdateWebFingerprint(webView, H2WebUserAgent(), seed, H2FakeEnabled());
 }
 
 %hook UIDevice
@@ -262,6 +266,8 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
     if (CFStringCompare(key, CFSTR("HardwareModel"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"board"];
     else if (CFStringCompare(key, CFSTR("ProductType"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"model"];
     else if (CFStringCompare(key, CFSTR("ProductVersion"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"ios"];
+    else if (CFStringCompare(key, CFSTR("InternationalMobileEquipmentIdentity"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"imei"];
+    else if (CFStringCompare(key, CFSTR("InternationalMobileEquipmentIdentity2"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"imei2"];
     if (answer) return CFStringCreateCopy(kCFAllocatorDefault, (__bridge CFStringRef)answer);
     return %orig;
 }

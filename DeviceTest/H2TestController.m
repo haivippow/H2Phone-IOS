@@ -2,6 +2,12 @@
 #import <sys/sysctl.h>
 #import <sys/utsname.h>
 #import <dlfcn.h>
+#import <AdSupport/AdSupport.h>
+#import <CoreLocation/CoreLocation.h>
+#import <CoreTelephony/CTCarrier.h>
+#import <CoreTelephony/CTTelephonyNetworkInfo.h>
+#import <CoreMotion/CoreMotion.h>
+#import <WebKit/WebKit.h>
 
 static NSString *H2SysctlValue(const char *key) {
     char value[128] = {0};
@@ -20,8 +26,12 @@ static NSString *H2GestaltValue(CFStringRef key) {
     return value;
 }
 
-@interface H2TestController ()
+@interface H2TestController () <CLLocationManagerDelegate, WKNavigationDelegate>
 @property (nonatomic, copy) NSArray<NSArray<NSString *> *> *values;
+@property (nonatomic, strong) CLLocationManager *locationManager;
+@property (nonatomic, strong) CMMotionManager *motionManager;
+@property (nonatomic, strong) WKWebView *webProbe;
+@property (nonatomic, copy) NSDictionary<NSString *, NSString *> *webValues;
 @end
 
 @implementation H2TestController
@@ -29,7 +39,44 @@ static NSString *H2GestaltValue(CFStringRef key) {
     [super viewDidLoad];
     self.title = @"DeviceTest";
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(refreshValues)];
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(refreshAll)];
+    UIDevice.currentDevice.batteryMonitoringEnabled = YES;
+    self.locationManager = [CLLocationManager new];
+    self.locationManager.delegate = self;
+    [self.locationManager requestWhenInUseAuthorization];
+    [self.locationManager startUpdatingLocation];
+    self.motionManager = [CMMotionManager new];
+    if (self.motionManager.accelerometerAvailable) [self.motionManager startAccelerometerUpdates];
+    if (self.motionManager.deviceMotionAvailable) [self.motionManager startDeviceMotionUpdates];
+    self.webProbe = [[WKWebView alloc] initWithFrame:CGRectMake(0, 0, 1, 1) configuration:[WKWebViewConfiguration new]];
+    self.webProbe.alpha = 0.01;
+    self.webProbe.navigationDelegate = self;
+    [self.view addSubview:self.webProbe];
+    [self.webProbe loadHTMLString:@"<html><body>Web API probe</body></html>" baseURL:nil];
+    [self refreshValues];
+}
+
+- (void)refreshAll {
+    [self refreshValues];
+    [self.webProbe reload];
+}
+
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+    NSString *script = @"(function(){var c=document.createElement('canvas');c.width=200;c.height=40;var x=c.getContext('2d');x.font='16px Arial';x.fillText('H2Canvas',8,24);var s=c.toDataURL();var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return {ua:navigator.userAgent,language:navigator.language,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,canvas:(h>>>0).toString(16)};})()";
+    [webView evaluateJavaScript:script completionHandler:^(id value, NSError *error) {
+        if ([value isKindOfClass:NSDictionary.class]) self.webValues = value;
+        else self.webValues = @{ @"ua": error.localizedDescription ?: @"(unavailable)" };
+        [self refreshValues];
+    }];
+}
+
+- (void)dealloc {
+    [self.locationManager stopUpdatingLocation];
+    [self.motionManager stopAccelerometerUpdates];
+    [self.motionManager stopDeviceMotionUpdates];
+}
+
+- (void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray<CLLocation *> *)locations {
     [self refreshValues];
 }
 
@@ -38,6 +85,11 @@ static NSString *H2GestaltValue(CFStringRef key) {
     NSString *machine = H2SysctlValue("hw.machine");
     struct utsname systemInfo = {0};
     NSString *unameMachine = uname(&systemInfo) == 0 ? [NSString stringWithUTF8String:systemInfo.machine] : @"(unavailable)";
+    CLLocation *location = self.locationManager.location;
+    NSString *gps = location ? [NSString stringWithFormat:@"%.4f, %.4f", location.coordinate.latitude, location.coordinate.longitude] : @"(permission/location unavailable)";
+    CTCarrier *carrier = [CTTelephonyNetworkInfo new].subscriberCellularProvider;
+    CMAcceleration acceleration = self.motionManager.accelerometerData.acceleration;
+    NSString *motion = self.motionManager.accelerometerData ? [NSString stringWithFormat:@"%.2f, %.2f, %.2f", acceleration.x, acceleration.y, acceleration.z] : @"(waiting for sensor)";
     self.values = @[
         @[@"Device name", device.name ?: @"(nil)"],
         @[@"Model", device.model ?: @"(nil)"],
@@ -49,7 +101,22 @@ static NSString *H2GestaltValue(CFStringRef key) {
         @[@"iOS (sysctl)", H2SysctlValue("kern.osproductversion")],
         @[@"iOS (NSProcessInfo)", NSProcessInfo.processInfo.operatingSystemVersionString],
         @[@"Board (MobileGestalt)", H2GestaltValue(CFSTR("HardwareModel"))],
-        @[@"iOS (MobileGestalt)", H2GestaltValue(CFSTR("ProductVersion"))]
+        @[@"iOS (MobileGestalt)", H2GestaltValue(CFSTR("ProductVersion"))],
+        @[@"IMEI 1 (MobileGestalt)", H2GestaltValue(CFSTR("InternationalMobileEquipmentIdentity"))],
+        @[@"IMEI 2 (MobileGestalt)", H2GestaltValue(CFSTR("InternationalMobileEquipmentIdentity2"))],
+        @[@"IDFA (ATT dependent)", ASIdentifierManager.sharedManager.advertisingIdentifier.UUIDString ?: @"(unavailable)"],
+        @[@"GPS (CoreLocation)", gps],
+        @[@"Locale", NSLocale.currentLocale.localeIdentifier],
+        @[@"Time zone", NSTimeZone.localTimeZone.name],
+        @[@"Carrier", carrier.carrierName ?: @"(no carrier)"],
+        @[@"MCC / MNC", [NSString stringWithFormat:@"%@ / %@", carrier.mobileCountryCode ?: @"-", carrier.mobileNetworkCode ?: @"-"]],
+        @[@"Radio", [CTTelephonyNetworkInfo new].currentRadioAccessTechnology ?: @"(unavailable)"],
+        @[@"Battery", device.batteryLevel >= 0 ? [NSString stringWithFormat:@"%.0f%%", device.batteryLevel * 100] : @"(unavailable)"],
+        @[@"Accelerometer", motion],
+        @[@"Web UA (JavaScript)", self.webValues[@"ua"] ?: @"(loading)"],
+        @[@"Web language", self.webValues[@"language"] ?: @"(loading)"],
+        @[@"Web time zone", self.webValues[@"timezone"] ?: @"(loading)"],
+        @[@"Canvas hash", self.webValues[@"canvas"] ?: @"(loading)"]
     ];
     [self.tableView reloadData];
 }

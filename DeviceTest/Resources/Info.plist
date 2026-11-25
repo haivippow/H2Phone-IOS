@@ -7,11 +7,13 @@
 <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
 <key>CFBundleName</key><string>DeviceTest</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.10</string>
+  <key>CFBundleShortVersionString</key><string>0.1.11</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>LSRequiresIPhoneOS</key><true/>
 <key>MinimumOSVersion</key><string>16.0</string>
 <key>UIDeviceFamily</key><array><integer>1</integer></array>
 <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>h2devicetest</string></array></dict></array>
 <key>UILaunchScreen</key><dict/>
+<key>NSLocationWhenInUseUsageDescription</key><string>Show the location API value for device profile testing.</string>
+<key>NSMotionUsageDescription</key><string>Show motion sensor API values for device profile testing.</string>
 </dict></plist>

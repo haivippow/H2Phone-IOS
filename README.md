@@ -21,6 +21,8 @@ Apps such as AIDA64 may read other APIs or cache results. Selecting an app does 
 
 Version 0.1.10 adds selected-app hooks for IDFA (only when ATT already exposes a nonzero identifier), GPS coordinates (Hanoi), Vietnamese locale/time zone, Viettel carrier fields, LTE radio technology, battery level/state, and selected CoreMotion vectors. Public IP, IMEI, and full web fingerprinting are not spoofed by these hooks.
 
+Version 0.1.11 adds synthetic primary/secondary IMEI responses for the MobileGestalt API inside selected apps, plus experimental JavaScript language/time-zone/User-Agent and Canvas readout overrides in selected apps' `WKWebView` pages. DeviceTest reads the IMEI keys and shows additional native/WebKit API values for comparison. These changes do not alter the modem IMEI and do not cover every browser fingerprint surface.
+
 ## Quick start
 
 Run setup and build commands using [docs/build-install.md](docs/build-install.md). On WSL2 Ubuntu 24.04, run `bash Scripts/build.sh`. A rootless `.deb` has been built in `packages/`; installation and behavior on an iPhone have not yet been tested.

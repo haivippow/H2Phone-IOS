@@ -1,4 +1,4 @@
-# Spoof coverage (0.1.10)
+# Spoof coverage (0.1.11)
 
 The tweak checks Fake ON and the current app bundle ID before returning profile values. Fake OFF calls the original API. Build and on-device status must be checked separately.
 
@@ -12,6 +12,8 @@ The tweak checks Fake ON and the current app bundle ID before returning profile 
 | Carrier / cellular radio | Viettel, MCC 452, MNC 04, ISO `vn`, LTE for existing radio services | Does not change SIM, Wi-Fi state, cellular connection, or public IP. |
 | Battery | 85% and unplugged when monitoring is enabled | Other battery/power APIs remain original. |
 | Motion | Selected acceleration, gravity, and rotation vector getters | Other sensor data and timestamps remain original. |
-| Web User-Agent | `WKWebView.customUserAgent` for selected apps | Safari and other apps require on-device verification; canvas and broader fingerprint properties remain original. |
+| Web User-Agent | `WKWebView.customUserAgent` for selected apps | Safari and other apps require on-device verification; broader fingerprint properties remain original. |
+| IMEI 1 / 2 | Synthetic 15-digit values returned for two MobileGestalt IMEI keys in selected apps | Real modem and carrier IMEI are unchanged. Other IMEI APIs are not covered. |
+| Web fingerprint | JavaScript User-Agent, language, time zone, Canvas `getImageData` and `toDataURL` in selected `WKWebView` pages | Does not cover WebGL, fonts, `toBlob`, all canvas paths, or server-side fingerprinting. Requires on-device verification. |
 
-IMEI is not available through the public app APIs used here. A server observes the real public IP unless network traffic is routed through a proxy or VPN. Canvas and full browser fingerprint spoofing need separate WebKit process work and device tests; the current source does not claim them.
+IMEI is not available through a public app API; the new hook targets private MobileGestalt queries only. A server observes the real public IP unless network traffic is routed through a proxy or VPN. Safari's separate WebKit processes and all browser fingerprint paths still need on-device testing; the current source does not claim full coverage.
