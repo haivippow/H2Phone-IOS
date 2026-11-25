@@ -4,7 +4,7 @@ Target: iPhone XS, iOS 16.1, Dopamine rootless, Sileo. The `.deb` package archit
 
 ## Environment status checked in this workspace
 
-The Windows host reports **Windows 10 Home Single Language, build 19045**. WSL2 Ubuntu 24.04, Theos, iPhoneOS16.5.sdk, clang and ldid were subsequently installed. `Scripts/build.sh` produced `packages/com.h2changer.ios_0.1.1_iphoneos-arm64.deb` and verified its metadata and rootless payload. The package has not been installed or tested on an iPhone yet.
+The Windows host reports **Windows 10 Home Single Language, build 19045**. WSL2 Ubuntu 24.04, Theos, iPhoneOS16.5.sdk, clang and ldid were subsequently installed. `Scripts/build.sh` produces a rootless `.deb` in `packages/` and verifies its metadata and payload. Device behavior still requires testing on an iPhone.
 
 ## Install WSL2 Ubuntu (run in an elevated PowerShell)
 

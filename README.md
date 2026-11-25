@@ -13,6 +13,8 @@ Native iPhone controller and isolated API test tweak for iPhone XS on iOS 16.1 w
 
 The tweak changes values returned inside selected apps for `UIDevice.name`, `model`, `systemVersion`, and `identifierForVendor`. Fake OFF and unselected apps call the original methods. DeviceTest is selected by default. It never writes hardware identifiers or system settings. The package installs both apps and the tweak as a rootless `.deb` via Sileo. TrollStore is part of the target environment but is not needed for this package; it does not inject the tweak.
 
+The **iPhone 13 Pro Max** profile additionally returns the model identifier `iPhone14,3` through `sysctlbyname("hw.machine")` and `uname` inside selected apps. DeviceTest shows both values for verification. Fake OFF returns the original API values.
+
 Apps such as AIDA64 may read other APIs (for example hardware model via `sysctl`) and may cache results. Selecting an app does not guarantee that every value it displays changes; this MVP covers only the four `UIDevice` methods above.
 
 ## Quick start

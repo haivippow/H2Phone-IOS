@@ -21,7 +21,7 @@ static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2chan
         return @{ @"schema": @1, @"enabled": @(NO), @"profile": @"Test A", @"enabledApps": @[H2TargetBundleID] };
     }
     NSString *profile = value[@"profile"];
-    if (![profile isKindOfClass:NSString.class] || ![@[@"Test A", @"Test B"] containsObject:profile]) profile = @"Test A";
+    if (![profile isKindOfClass:NSString.class] || ![@[@"Test A", @"Test B", @"iPhone 13 Pro Max"] containsObject:profile]) profile = @"Test A";
     NSArray *apps = value[@"enabledApps"];
     if (![apps isKindOfClass:NSArray.class]) apps = @[H2TargetBundleID];
     NSMutableArray *validApps = [NSMutableArray array];
@@ -32,7 +32,7 @@ static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2chan
 }
 
 - (BOOL)saveEnabled:(BOOL)enabled profile:(NSString *)profile error:(NSError **)error {
-    if (![@[@"Test A", @"Test B"] containsObject:profile]) {
+    if (![@[@"Test A", @"Test B", @"iPhone 13 Pro Max"] containsObject:profile]) {
         if (error) *error = [NSError errorWithDomain:@"H2Config" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Unknown profile"}];
         return NO;
     }
