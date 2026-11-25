@@ -10,45 +10,39 @@ static BOOL H2FakeEnabled(void) {
     return [[H2ConfigManager sharedManager] isFakeActiveForBundleID:[NSBundle mainBundle].bundleIdentifier];
 }
 
-static BOOL H2ProfileB(void) {
-    return [[[[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier] objectForKey:@"profile"] isEqualToString:@"Test B"];
-}
-
-static BOOL H2Profile13ProMax(void) {
-    return [[[[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier] objectForKey:@"profile"] isEqualToString:@"iPhone 13 Pro Max"];
+static NSDictionary<NSString *, NSString *> *H2Profile(void) {
+    NSString *name = [[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier][@"profile"];
+    return [H2ConfigManager profileNamed:name];
 }
 
 %hook UIDevice
 
 - (NSString *)name {
     if (!H2FakeEnabled()) return %orig;
-    if (H2Profile13ProMax()) return @"iPhone 13 Pro Max";
-    return H2ProfileB() ? @"H2 Test Phone B" : @"H2 Test Phone A";
+    return H2Profile()[@"name"];
 }
 
 - (NSString *)model {
     if (!H2FakeEnabled()) return %orig;
-    if (H2Profile13ProMax()) return @"iPhone 13 Pro Max";
-    return @"iPhone";
+    return H2Profile()[@"name"];
 }
 
 - (NSString *)systemVersion {
     if (!H2FakeEnabled()) return %orig;
-    if (H2Profile13ProMax()) return @"16.1";
-    return H2ProfileB() ? @"16.2" : @"16.1";
+    return H2Profile()[@"ios"];
 }
 
 - (NSUUID *)identifierForVendor {
     if (!H2FakeEnabled()) return %orig;
-    NSString *uuid = H2Profile13ProMax() ? @"9B625883-76C1-47D2-9D80-2EB2A397A134" : (H2ProfileB() ? @"B91D7391-E48A-47D4-A217-6A99A7E7C0B2" : @"A729AE2B-9B2A-4DBF-8E45-4ACCC1F17608");
+    NSString *uuid = H2Profile()[@"uuid"];
     return [[NSUUID alloc] initWithUUIDString:uuid];
 }
 
 %end
 
 %hookf(int, sysctlbyname, const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
-    if (!name || strcmp(name, "hw.machine") != 0 || newp || !H2FakeEnabled() || !H2Profile13ProMax()) return %orig;
-    const char *model = "iPhone14,3";
+    if (!name || strcmp(name, "hw.machine") != 0 || newp || !H2FakeEnabled()) return %orig;
+    const char *model = [H2Profile()[@"model"] UTF8String];
     size_t required = strlen(model) + 1;
     if (!oldlenp) { errno = EINVAL; return -1; }
     if (!oldp) { *oldlenp = required; return 0; }
@@ -60,8 +54,8 @@ static BOOL H2Profile13ProMax(void) {
 
 %hookf(int, uname, struct utsname *name) {
     int result = %orig;
-    if (result == 0 && name && H2FakeEnabled() && H2Profile13ProMax()) {
-        snprintf(name->machine, sizeof(name->machine), "%s", "iPhone14,3");
+    if (result == 0 && name && H2FakeEnabled()) {
+        snprintf(name->machine, sizeof(name->machine), "%s", [H2Profile()[@"model"] UTF8String]);
     }
     return result;
 }

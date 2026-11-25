@@ -6,13 +6,27 @@ NSString * const H2TargetBundleID = @"com.h2phone.devicetest";
 NSString * const H2SafariBundleID = @"com.apple.mobilesafari";
 static NSString * const H2ConfigPath = @"/var/mobile/Library/Preferences/com.h2changer.config.plist";
 static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2changer.debug.log";
-static uint64_t const H2RuntimeMagic = 0x4832434800000000ULL;
+static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
 
 @interface H2ConfigManager ()
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *runtimeTokens;
 @end
 
 @implementation H2ConfigManager
+
++ (NSArray<NSDictionary<NSString *, NSString *> *> *)profiles {
+    return @[
+        @{ @"name": @"iPhone 13 Pro Max", @"model": @"iPhone14,3", @"ios": @"17.7", @"uuid": @"9B625883-76C1-47D2-9D80-2EB2A397A134" },
+        @{ @"name": @"iPhone 14 Pro Max", @"model": @"iPhone15,3", @"ios": @"17.6", @"uuid": @"B91D7391-E48A-47D4-A217-6A99A7E7C0B2" },
+        @{ @"name": @"iPhone 15 Pro Max", @"model": @"iPhone16,2", @"ios": @"18.0", @"uuid": @"A729AE2B-9B2A-4DBF-8E45-4ACCC1F17608" },
+        @{ @"name": @"iPhone 16 Pro Max", @"model": @"iPhone17,2", @"ios": @"18.1", @"uuid": @"85E8AB49-0F63-4E66-A854-C95126E85E1D" }
+    ];
+}
+
++ (NSDictionary<NSString *, NSString *> *)profileNamed:(NSString *)name {
+    for (NSDictionary *profile in [self profiles]) if ([profile[@"name"] isEqualToString:name]) return profile;
+    return [self profiles][0];
+}
 
 + (instancetype)sharedManager {
     static H2ConfigManager *manager;
@@ -24,10 +38,10 @@ static uint64_t const H2RuntimeMagic = 0x4832434800000000ULL;
 - (NSDictionary<NSString *, id> *)snapshot {
     NSDictionary *value = [NSDictionary dictionaryWithContentsOfFile:H2ConfigPath];
     if (![value isKindOfClass:NSDictionary.class] || ![value[@"schema"] isEqual:@1]) {
-        return @{ @"schema": @1, @"enabled": @(NO), @"profile": @"Test A", @"enabledApps": @[H2TargetBundleID] };
+        return @{ @"schema": @1, @"enabled": @(NO), @"profile": [H2ConfigManager profiles][0][@"name"], @"enabledApps": @[H2TargetBundleID] };
     }
     NSString *profile = value[@"profile"];
-    if (![profile isKindOfClass:NSString.class] || ![@[@"Test A", @"Test B", @"iPhone 13 Pro Max"] containsObject:profile]) profile = @"Test A";
+    profile = [H2ConfigManager profileNamed:profile][@"name"];
     NSArray *apps = value[@"enabledApps"];
     if (![apps isKindOfClass:NSArray.class]) apps = @[H2TargetBundleID];
     NSMutableArray *validApps = [NSMutableArray array];
@@ -38,7 +52,7 @@ static uint64_t const H2RuntimeMagic = 0x4832434800000000ULL;
 }
 
 - (BOOL)saveEnabled:(BOOL)enabled profile:(NSString *)profile error:(NSError **)error {
-    if (![@[@"Test A", @"Test B", @"iPhone 13 Pro Max"] containsObject:profile]) {
+    if (![[H2ConfigManager profileNamed:profile][@"name"] isEqualToString:profile]) {
         if (error) *error = [NSError errorWithDomain:@"H2Config" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Unknown profile"}];
         return NO;
     }
@@ -101,7 +115,9 @@ static uint64_t const H2RuntimeMagic = 0x4832434800000000ULL;
     if (token < 0) return;
     BOOL active = [config[@"enabled"] boolValue] && [config[@"enabledApps"] containsObject:bundleID];
     NSString *profile = config[@"profile"];
-    uint64_t profileCode = [profile isEqualToString:@"iPhone 13 Pro Max"] ? 2 : ([profile isEqualToString:@"Test B"] ? 1 : 0);
+    uint64_t profileCode = 0;
+    NSArray *profiles = [H2ConfigManager profiles];
+    for (NSUInteger i = 0; i < profiles.count; i++) if ([profiles[i][@"name"] isEqualToString:profile]) { profileCode = i; break; }
     uint64_t state = H2RuntimeMagic | (profileCode << 8) | (active ? 1 : 0);
     notify_set_state(token, state);
     notify_post([self runtimeNameForBundleID:bundleID].UTF8String);
@@ -118,7 +134,8 @@ static uint64_t const H2RuntimeMagic = 0x4832434800000000ULL;
     uint64_t state = 0;
     if (token >= 0 && notify_get_state(token, &state) == 0 && (state & 0xffffffff00000000ULL) == H2RuntimeMagic) {
         uint64_t code = (state >> 8) & 0xff;
-        NSString *profile = code == 2 ? @"iPhone 13 Pro Max" : (code == 1 ? @"Test B" : @"Test A");
+        NSArray *profiles = [H2ConfigManager profiles];
+        NSString *profile = profiles[code < profiles.count ? code : 0][@"name"];
         return @{ @"enabled": @((state & 1) != 0), @"profile": profile };
     }
     BOOL active = [fallback[@"enabled"] boolValue] && [fallback[@"enabledApps"] containsObject:bundleID];

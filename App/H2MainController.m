@@ -23,7 +23,7 @@
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 5; }
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return section == 2 ? 3 : 1; }
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return section == 2 ? [H2ConfigManager profiles].count : 1; }
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     return @[@"Dashboard", @"Test Apps", @"Profiles", @"Control", @"Debug Logs"][section];
 }
@@ -43,8 +43,9 @@
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             break;
         case 2:
-            cell.textLabel.text = @[@"Test A · iOS 16.1", @"Test B · iOS 16.2", @"iPhone 13 Pro Max · iOS 16.1"][indexPath.row];
-            cell.accessoryType = [config[@"profile"] isEqualToString:@[@"Test A", @"Test B", @"iPhone 13 Pro Max"][indexPath.row]] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+            cell.textLabel.text = [H2ConfigManager profiles][indexPath.row][@"name"];
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ · iOS %@", [H2ConfigManager profiles][indexPath.row][@"model"], [H2ConfigManager profiles][indexPath.row][@"ios"]];
+            cell.accessoryType = [config[@"profile"] isEqualToString:[H2ConfigManager profiles][indexPath.row][@"name"]] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
             break;
         case 3:
             cell.textLabel.text = @"Restore Original";
@@ -79,7 +80,7 @@
         [self.navigationController pushViewController:[H2AppListController new] animated:YES];
     } else if (indexPath.section == 2) {
         NSError *error;
-        NSString *profile = @[@"Test A", @"Test B", @"iPhone 13 Pro Max"][indexPath.row];
+        NSString *profile = [H2ConfigManager profiles][indexPath.row][@"name"];
         BOOL enabled = [[H2ConfigManager.sharedManager snapshot][@"enabled"] boolValue];
         if (![H2ConfigManager.sharedManager saveEnabled:enabled profile:profile error:&error]) [self showError:error];
         [self.tableView reloadData];

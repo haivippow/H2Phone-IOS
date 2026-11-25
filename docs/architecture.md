@@ -1,6 +1,6 @@
 # Architecture
 
-The UIKit controller calls `H2ConfigManager` to save a binary plist at `/var/mobile/Library/Preferences/com.h2changer.config.plist`. It contains `schema` (integer `1`), `enabled` (boolean), `profile` (`Test A` or `Test B`), and `enabledApps` (bundle ID array). Saving uses an atomic file write and posts `com.h2changer.config.changed`. The tweak rereads the file on each hooked API call. Invalid or absent configuration defaults to Fake OFF and DeviceTest as the selected app.
+The UIKit controller calls `H2ConfigManager` to save a binary plist at `/var/mobile/Library/Preferences/com.h2changer.config.plist`. It contains `schema` (integer `1`), `enabled` (boolean), `profile` (one of four iPhone Pro Max names), and `enabledApps` (bundle ID array). Saving uses an atomic file write and posts `com.h2changer.config.changed`. The controller also publishes a compact per-app state through Darwin notifications for sandboxed target apps. The tweak reads that state and falls back to the plist. Invalid or absent configuration defaults to Fake OFF and DeviceTest as the selected app. Old Test A/B profile names fall back to the first current profile.
 
 The independent manager is the future Agent boundary. A Windows C# controller can later communicate with an on-device agent, which validates requests and writes the same schema. The current MVP has no network listener or Windows dependency.
 
