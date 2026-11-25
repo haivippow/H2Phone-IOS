@@ -4,7 +4,7 @@ Target: iPhone XS, iOS 16.1, Dopamine rootless, Sileo. The `.deb` package archit
 
 ## Environment status checked in this workspace
 
-The Windows host reports **Windows 10 Home Single Language, build 19045**. WSL2 Ubuntu 24.04, Theos, iPhoneOS16.5.sdk, clang and ldid were subsequently installed. `Scripts/build.sh` produced `packages/com.h2changer.ios_0.1.0_iphoneos-arm64.deb` and verified its metadata and rootless payload. The package has not been installed or tested on an iPhone yet.
+The Windows host reports **Windows 10 Home Single Language, build 19045**. WSL2 Ubuntu 24.04, Theos, iPhoneOS16.5.sdk, clang and ldid were subsequently installed. `Scripts/build.sh` produced `packages/com.h2changer.ios_0.1.1_iphoneos-arm64.deb` and verified its metadata and rootless payload. The package has not been installed or tested on an iPhone yet.
 
 ## Install WSL2 Ubuntu (run in an elevated PowerShell)
 
@@ -49,6 +49,8 @@ bash Scripts/build.sh
 The script checks WSL2, Theos, SDK, toolchain, rootless settings and output package contents. It prints `DEB_OK: ...` only after a new non-empty `.deb` passes package ID, architecture and file checks. The output is in `/mnt/d/H2PHONE-IOS/packages/` (`D:\H2PHONE-IOS\packages` in Windows). `THEOS_PACKAGE_SCHEME=rootless` puts payload files under `/var/jb`.
 
 ## Install on the iPhone
+
+Before installing H2Changer on Dopamine, check that **ElleKit** is installed in Sileo. If Sileo cannot resolve `ellekit`, add the [official ElleKit source](https://ellekit.space/) (`https://ellekit.space/`) and install ElleKit there, then retry the H2Changer package. H2Changer 0.1.1 depends on `ellekit` directly instead of the virtual package `mobilesubstrate`.
 
 Copy the produced `.deb` to the phone, open it in Sileo, and install. Alternatively, with SSH configured:
 
