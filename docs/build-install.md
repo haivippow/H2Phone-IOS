@@ -8,17 +8,19 @@ The current Windows host reports **Windows 10 Home Single Language, build 19045*
 
 ## Install WSL2 Ubuntu (run in an elevated PowerShell)
 
-Windows 10 build 19045 supports WSL2. Follow [Microsoft's WSL install guide](https://learn.microsoft.com/en-us/windows/wsl/install). First try:
+Windows 10 build 19045 supports WSL2. Follow [Microsoft's WSL install guide](https://learn.microsoft.com/en-us/windows/wsl/install). Use Ubuntu **24.04 LTS** for the current Theos Linux installer:
 
 ```powershell
-wsl --install -d Ubuntu
+wsl --install -d Ubuntu-24.04
 ```
 
-Restart Windows, launch Ubuntu once and create a Linux user. Verify with `wsl --list --verbose`; Ubuntu must show version **2**. If `wsl --install` only prints help, use [Microsoft's manual installation steps](https://learn.microsoft.com/en-us/windows/wsl/install-manual), including the two optional features, reboot, WSL2 kernel/update and Ubuntu installation. These commands require Administrator rights and are intentionally left for you to run.
+Restart Windows, launch Ubuntu 24.04 once and create a Linux user. Verify with `wsl --list --verbose`; `Ubuntu-24.04` must show version **2**. If `wsl --install` only prints help, use [Microsoft's manual installation steps](https://learn.microsoft.com/en-us/windows/wsl/install-manual), including the two optional features, reboot, WSL2 kernel/update and Ubuntu installation. These commands require Administrator rights and are intentionally left for you to run.
+
+Ubuntu 26.04 (`resolute`) renamed the `libxml2` runtime package to `libxml2-16`. The current Theos installer still asks apt for `libxml2` and stops before installing Theos. Keep that distribution if you use it for other work; install `Ubuntu-24.04` alongside it for this build. [Ubuntu package listings](https://packages.ubuntu.com/search?keywords=libxml2&searchon=names&suite=all) show the version difference.
 
 ## Install Theos in Ubuntu
 
-Use the [official Theos Linux/WSL guide](https://theos.dev/docs/installation-linux). In Ubuntu:
+Start the supported distribution with `wsl -d Ubuntu-24.04` from PowerShell. Use the [official Theos Linux/WSL guide](https://theos.dev/docs/installation-linux). In Ubuntu 24.04:
 
 ```sh
 sudo apt update
