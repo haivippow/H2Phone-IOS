@@ -1,18 +1,50 @@
-# Build and install
+# Build on Windows with WSL2 Ubuntu
 
-Target: iPhone XS, iOS 16.1, Dopamine rootless, Sileo. The package is `iphoneos-arm64`; `ARCHS = arm64` is intentional because these apps are ordinary app binaries and the hook targets user apps.
+Target: iPhone XS, iOS 16.1, Dopamine rootless, Sileo. The `.deb` package architecture is `iphoneos-arm64`. All three binaries (H2Changer, DeviceTest and H2ChangerHook) use `arm64`. The tweak targets ordinary third-party apps, not an arm64e system binary, so an arm64e slice and the macOS-only new arm64e ABI toolchain are unnecessary. Theos [documents this distinction](https://theos.dev/docs/rootless). The build uses an iOS 16.0 deployment target and an SDK version 16.0 or newer; SDK 16.5 can build for iOS 16.1.
 
-## Setup on macOS
+## Environment status checked in this workspace
 
-Install Xcode command line tools and Theos with an iPhoneOS SDK. Follow the current [Theos installation guide](https://theos.dev/docs/installation). Then run:
+The current Windows host reports **Windows 10 Home Single Language, build 19045**. `wsl --status`, `wsl --list --verbose` and `wsl -- bash` returned WSL usage text rather than a distribution or shell. No Ubuntu package, Theos installation, iOS SDK, toolchain or `packages/*.deb` was found. Windows feature state could not be read without an elevated shell. Therefore no device package has been built here.
 
-```sh
-export THEOS="$HOME/theos"
-cd H2Changer-iOS
-make clean package FINALPACKAGE=1
+## Install WSL2 Ubuntu (run in an elevated PowerShell)
+
+Windows 10 build 19045 supports WSL2. Follow [Microsoft's WSL install guide](https://learn.microsoft.com/en-us/windows/wsl/install). First try:
+
+```powershell
+wsl --install -d Ubuntu
 ```
 
-The package appears in `packages/`. The Makefile sets `THEOS_PACKAGE_SCHEME=rootless`, which places installed files under `/var/jb` and uses the rootless package architecture.
+Restart Windows, launch Ubuntu once and create a Linux user. Verify with `wsl --list --verbose`; Ubuntu must show version **2**. If `wsl --install` only prints help, use [Microsoft's manual installation steps](https://learn.microsoft.com/en-us/windows/wsl/install-manual), including the two optional features, reboot, WSL2 kernel/update and Ubuntu installation. These commands require Administrator rights and are intentionally left for you to run.
+
+## Install Theos in Ubuntu
+
+Use the [official Theos Linux/WSL guide](https://theos.dev/docs/installation-linux). In Ubuntu:
+
+```sh
+sudo apt update
+sudo apt install -y bash curl sudo git make perl python3 dpkg-dev xz-utils
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+export THEOS="$HOME/theos"
+```
+
+The Theos installer supplies its toolchain. Check `$THEOS/makefiles/common.mk`, `$THEOS/toolchain/`, and `ldid` before building. The official [Theos SDK repository](https://github.com/theos/sdks) offers iPhoneOS16.5.sdk. If the installer did not provide a suitable SDK, install this release asset:
+
+```sh
+mkdir -p "$THEOS/sdks"
+curl -fL -o /tmp/iPhoneOS16.5.sdk.tar.xz https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS16.5.sdk.tar.xz
+tar -xJf /tmp/iPhoneOS16.5.sdk.tar.xz -C "$THEOS/sdks"
+```
+
+## Build
+
+From Ubuntu, run the script against the Windows checkout:
+
+```sh
+cd /mnt/d/H2PHONE-IOS
+bash Scripts/build.sh
+```
+
+The script checks WSL2, Theos, SDK, toolchain, rootless settings and output package contents. It prints `DEB_OK: ...` only after a new non-empty `.deb` passes package ID, architecture and file checks. The output is in `/mnt/d/H2PHONE-IOS/packages/` (`D:\H2PHONE-IOS\packages` in Windows). `THEOS_PACKAGE_SCHEME=rootless` puts payload files under `/var/jb`.
 
 ## Install on the iPhone
 

@@ -17,4 +17,4 @@ Apps such as AIDA64 may read other APIs (for example hardware model via `sysctl`
 
 ## Quick start
 
-Run setup and build commands yourself using [docs/build-install.md](docs/build-install.md). Build on macOS or a configured Theos environment. Windows here has no Theos/iOS SDK, so a device build has not been executed in this workspace.
+Run setup and build commands yourself using [docs/build-install.md](docs/build-install.md). On WSL2 Ubuntu, run `bash Scripts/build.sh`. The current host has no usable WSL distribution or Theos/iOS SDK, so a device build has not been executed in this workspace.
