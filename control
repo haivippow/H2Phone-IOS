@@ -1,6 +1,6 @@
 Package: com.h2changer.ios
 Name: H2Changer iOS
-Version: 0.1.7
+Version: 0.1.8
 Architecture: iphoneos-arm64
 Description: Local device API test controller and isolated test tweak
 Maintainer: H2Changer

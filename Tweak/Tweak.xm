@@ -6,6 +6,11 @@
 #import <stdio.h>
 #import <string.h>
 #import <dlfcn.h>
+#import <WebKit/WebKit.h>
+#import <objc/runtime.h>
+
+static char H2OriginalUserAgentKey;
+static __thread BOOL H2SettingSafariUserAgent;
 
 static BOOL H2FakeEnabled(void) {
     return [[H2ConfigManager sharedManager] isFakeActiveForBundleID:[NSBundle mainBundle].bundleIdentifier];
@@ -14,6 +19,30 @@ static BOOL H2FakeEnabled(void) {
 static NSDictionary<NSString *, NSString *> *H2Profile(void) {
     NSString *name = [[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier][@"profile"];
     return [H2ConfigManager profileNamed:name];
+}
+
+static NSString *H2SafariUserAgent(void) {
+    NSString *version = H2Profile()[@"ios"];
+    NSString *cpuVersion = [version stringByReplacingOccurrencesOfString:@"." withString:@"_"];
+    return [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/%@ Mobile/15E148 Safari/604.1", cpuVersion, version];
+}
+
+static void H2ApplySafariUserAgent(WKWebView *webView) {
+    id original = objc_getAssociatedObject(webView, &H2OriginalUserAgentKey);
+    if (H2FakeEnabled()) {
+        if (!original) objc_setAssociatedObject(webView, &H2OriginalUserAgentKey, webView.customUserAgent ?: NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NSString *fake = H2SafariUserAgent();
+        if (![webView.customUserAgent isEqualToString:fake]) {
+            H2SettingSafariUserAgent = YES;
+            webView.customUserAgent = fake;
+            H2SettingSafariUserAgent = NO;
+        }
+    } else if (original) {
+        H2SettingSafariUserAgent = YES;
+        webView.customUserAgent = original == NSNull.null ? nil : original;
+        H2SettingSafariUserAgent = NO;
+        objc_setAssociatedObject(webView, &H2OriginalUserAgentKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
 }
 
 %hook UIDevice
@@ -104,10 +133,34 @@ static NSDictionary<NSString *, NSString *> *H2Profile(void) {
 }
 %end
 
+%group H2SafariUA
+%hook WKWebView
+
+- (instancetype)initWithFrame:(CGRect)frame configuration:(WKWebViewConfiguration *)configuration {
+    WKWebView *webView = %orig;
+    if (webView) H2ApplySafariUserAgent(webView);
+    return webView;
+}
+
+- (WKNavigation *)loadRequest:(NSURLRequest *)request {
+    H2ApplySafariUserAgent(self);
+    return %orig;
+}
+
+- (void)setCustomUserAgent:(NSString *)userAgent {
+    if (H2SettingSafariUserAgent || !H2FakeEnabled()) return %orig;
+    objc_setAssociatedObject(self, &H2OriginalUserAgentKey, userAgent ?: NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return %orig(H2SafariUserAgent());
+}
+
+%end
+%end
+
 %ctor {
     NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
     if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return;
     %init;
+    if ([bundleID isEqualToString:H2SafariBundleID]) %init(H2SafariUA);
     void *gestalt = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_LAZY);
     void *copyAnswer = gestalt ? dlsym(gestalt, "MGCopyAnswer") : NULL;
     if (copyAnswer) %init(H2MobileGestalt, MGCopyAnswer = copyAnswer);

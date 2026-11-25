@@ -15,7 +15,7 @@ The tweak changes values returned inside selected apps for `UIDevice.name`, `mod
 
 Profiles include iPhone 13 Pro Max (iOS 17.7), 14 Pro Max (iOS 17.6), 15 Pro Max (iOS 18.0), and 16 Pro Max (iOS 18.1). Each profile returns its matching model identifier through `sysctlbyname("hw.machine")` and `uname` inside selected apps. DeviceTest shows both values for verification. Fake OFF returns the original API values. These values do not upgrade the actual iOS installation.
 
-Safari appears in Test Apps and can be selected explicitly. The current hooks affect native API reads in the Safari app process; web pages run in separate WebKit processes and JavaScript fingerprint values are outside this MVP.
+Safari appears in Test Apps and can be selected explicitly. Version 0.1.8 adds an experimental Safari `WKWebView` User-Agent override when Safari is selected and Fake is ON. It restores the prior `WKWebView` User-Agent on Fake OFF. Safari uses separate WebKit processes, so this needs on-device verification for both `navigator.userAgent` and the HTTP User-Agent header. Other JavaScript fingerprint values are outside this hook's scope.
 
 To check a website's User-Agent, turn Fake ON, select a profile, then open **Web Browser** inside H2Changer. Its home page displays `navigator.userAgent`; tap **Check HTTP headers** to inspect the request User-Agent reported by the server. Enter a URL in the address field to browse. Fake OFF uses WebKit's original User-Agent. This browser changes only the User-Agent string; it does not change other JavaScript fingerprint values or Safari's User-Agent.
 
