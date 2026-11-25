@@ -18,11 +18,17 @@ static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2chan
 - (NSDictionary<NSString *, id> *)snapshot {
     NSDictionary *value = [NSDictionary dictionaryWithContentsOfFile:H2ConfigPath];
     if (![value isKindOfClass:NSDictionary.class] || ![value[@"schema"] isEqual:@1]) {
-        return @{ @"schema": @1, @"enabled": @(NO), @"profile": @"Test A" };
+        return @{ @"schema": @1, @"enabled": @(NO), @"profile": @"Test A", @"enabledApps": @[H2TargetBundleID] };
     }
     NSString *profile = value[@"profile"];
     if (![profile isKindOfClass:NSString.class] || ![@[@"Test A", @"Test B"] containsObject:profile]) profile = @"Test A";
-    return @{ @"schema": @1, @"enabled": @([value[@"enabled"] boolValue]), @"profile": profile };
+    NSArray *apps = value[@"enabledApps"];
+    if (![apps isKindOfClass:NSArray.class]) apps = @[H2TargetBundleID];
+    NSMutableArray *validApps = [NSMutableArray array];
+    for (id bundleID in apps) {
+        if ([bundleID isKindOfClass:NSString.class] && [bundleID length] > 0) [validApps addObject:bundleID];
+    }
+    return @{ @"schema": @1, @"enabled": @([value[@"enabled"] boolValue]), @"profile": profile, @"enabledApps": validApps };
 }
 
 - (BOOL)saveEnabled:(BOOL)enabled profile:(NSString *)profile error:(NSError **)error {
@@ -30,7 +36,7 @@ static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2chan
         if (error) *error = [NSError errorWithDomain:@"H2Config" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Unknown profile"}];
         return NO;
     }
-    NSDictionary *value = @{ @"schema": @1, @"enabled": @(enabled), @"profile": profile };
+    NSDictionary *value = @{ @"schema": @1, @"enabled": @(enabled), @"profile": profile, @"enabledApps": [self snapshot][@"enabledApps"] };
     NSData *data = [NSPropertyListSerialization dataWithPropertyList:value format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
     if (!data || ![data writeToFile:H2ConfigPath options:NSDataWritingAtomic error:error]) return NO;
     notify_post(H2ConfigChangedNotification.UTF8String);
@@ -41,6 +47,28 @@ static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2chan
 - (BOOL)restoreOriginal:(NSError **)error {
     NSDictionary *current = [self snapshot];
     return [self saveEnabled:NO profile:current[@"profile"] error:error];
+}
+
+- (BOOL)setAppEnabled:(BOOL)enabled bundleID:(NSString *)bundleID error:(NSError **)error {
+    if (bundleID.length == 0 || [bundleID hasPrefix:@"com.apple."] || [bundleID isEqualToString:@"com.h2changer.app"]) {
+        if (error) *error = [NSError errorWithDomain:@"H2Config" code:2 userInfo:@{NSLocalizedDescriptionKey: @"This app cannot be selected."}];
+        return NO;
+    }
+    NSDictionary *current = [self snapshot];
+    NSMutableOrderedSet *apps = [NSMutableOrderedSet orderedSetWithArray:current[@"enabledApps"]];
+    if (enabled) [apps addObject:bundleID]; else [apps removeObject:bundleID];
+    NSDictionary *value = @{ @"schema": @1, @"enabled": current[@"enabled"], @"profile": current[@"profile"], @"enabledApps": apps.array };
+    NSData *data = [NSPropertyListSerialization dataWithPropertyList:value format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
+    if (!data || ![data writeToFile:H2ConfigPath options:NSDataWritingAtomic error:error]) return NO;
+    notify_post(H2ConfigChangedNotification.UTF8String);
+    [self appendLog:[NSString stringWithFormat:@"App %@: %@", enabled ? @"enabled" : @"disabled", bundleID]];
+    return YES;
+}
+
+- (BOOL)isFakeActiveForBundleID:(NSString *)bundleID {
+    if (bundleID.length == 0 || [bundleID hasPrefix:@"com.apple."] || [bundleID isEqualToString:@"com.h2changer.app"]) return NO;
+    NSDictionary *config = [self snapshot];
+    return [config[@"enabled"] boolValue] && [config[@"enabledApps"] containsObject:bundleID];
 }
 
 - (void)appendLog:(NSString *)message {

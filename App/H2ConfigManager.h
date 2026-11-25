@@ -10,6 +10,8 @@ FOUNDATION_EXPORT NSString * const H2TargetBundleID;
 - (NSDictionary<NSString *, id> *)snapshot;
 - (BOOL)saveEnabled:(BOOL)enabled profile:(NSString *)profile error:(NSError **)error;
 - (BOOL)restoreOriginal:(NSError **)error;
+- (BOOL)setAppEnabled:(BOOL)enabled bundleID:(NSString *)bundleID error:(NSError **)error;
+- (BOOL)isFakeActiveForBundleID:(NSString *)bundleID;
 - (void)appendLog:(NSString *)message;
 - (NSArray<NSString *> *)recentLogs;
 @end

@@ -1,1 +1,1 @@
-{ Filter = { Bundles = ( "com.h2phone.devicetest" ); }; }
+{ Filter = { Bundles = ( "com.apple.UIKit" ); }; }

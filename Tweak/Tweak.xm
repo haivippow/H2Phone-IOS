@@ -2,7 +2,7 @@
 #import "H2ConfigManager.h"
 
 static BOOL H2FakeEnabled(void) {
-    return [[[H2ConfigManager sharedManager] snapshot][@"enabled"] boolValue];
+    return [[H2ConfigManager sharedManager] isFakeActiveForBundleID:[NSBundle mainBundle].bundleIdentifier];
 }
 
 static BOOL H2ProfileB(void) {
@@ -35,8 +35,7 @@ static BOOL H2ProfileB(void) {
 %end
 
 %ctor {
-    if ([[NSBundle mainBundle].bundleIdentifier isEqualToString:H2TargetBundleID]) {
-        [[H2ConfigManager sharedManager] appendLog:@"Tweak loaded in DeviceTest"];
-        %init;
-    }
+    NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
+    if (bundleID.length == 0 || [bundleID hasPrefix:@"com.apple."] || [bundleID isEqualToString:@"com.h2changer.app"]) return;
+    %init;
 }

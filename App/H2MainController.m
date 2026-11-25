@@ -1,5 +1,6 @@
 #import "H2MainController.h"
 #import "H2ConfigManager.h"
+#import "H2AppListController.h"
 
 @interface H2MainController ()
 @property (nonatomic, strong) UISwitch *fakeSwitch;
@@ -37,8 +38,8 @@
             cell.accessoryView = self.fakeSwitch;
             break;
         case 1:
-            cell.textLabel.text = @"DeviceTest";
-            cell.detailTextLabel.text = H2TargetBundleID;
+            cell.textLabel.text = @"Choose apps";
+            cell.detailTextLabel.text = [NSString stringWithFormat:@"%lu selected", (unsigned long)[config[@"enabledApps"] count]];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             break;
         case 2:
@@ -75,10 +76,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     if (indexPath.section == 1) {
-        NSURL *url = [NSURL URLWithString:@"h2devicetest://open"];
-        [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:^(BOOL success) {
-            if (!success) [self showError:[NSError errorWithDomain:@"H2Changer" code:2 userInfo:@{NSLocalizedDescriptionKey: @"DeviceTest is not installed or cannot open."}]];
-        }];
+        [self.navigationController pushViewController:[H2AppListController new] animated:YES];
     } else if (indexPath.section == 2) {
         NSError *error;
         NSString *profile = indexPath.row == 0 ? @"Test A" : @"Test B";
