@@ -4,7 +4,7 @@ Native iPhone controller and isolated API test tweak for iPhone XS on iOS 16.1 w
 
 ## Modules
 
-- `App/`: UIKit controller with Dashboard, installed user app selection, Profiles, Fake ON/OFF, Restore Original, and Debug Logs.
+- `App/`: UIKit controller with Dashboard, installed user app selection, Profiles, Fake ON/OFF, Restore Original, Debug Logs, and a WebKit browser with profile User-Agent.
 - `Tweak/`: Logos hook, loaded in UIKit apps with a per-app allowlist check before returning fake values.
 - `App/H2ConfigManager.*`: file-based Config Manager; a future C# agent can write the same schema.
 - `DeviceTest/`: real UIKit app showing values returned by `UIDevice` APIs.
@@ -16,6 +16,8 @@ The tweak changes values returned inside selected apps for `UIDevice.name`, `mod
 Profiles include iPhone 13 Pro Max (iOS 17.7), 14 Pro Max (iOS 17.6), 15 Pro Max (iOS 18.0), and 16 Pro Max (iOS 18.1). Each profile returns its matching model identifier through `sysctlbyname("hw.machine")` and `uname` inside selected apps. DeviceTest shows both values for verification. Fake OFF returns the original API values. These values do not upgrade the actual iOS installation.
 
 Safari appears in Test Apps and can be selected explicitly. The current hooks affect native API reads in the Safari app process; web pages run in separate WebKit processes and JavaScript fingerprint values are outside this MVP.
+
+To check a website's User-Agent, turn Fake ON, select a profile, then open **Web Browser** inside H2Changer. Its home page displays `navigator.userAgent`; tap **Check HTTP headers** to inspect the request User-Agent reported by the server. Enter a URL in the address field to browse. Fake OFF uses WebKit's original User-Agent. This browser changes only the User-Agent string; it does not change other JavaScript fingerprint values or Safari's User-Agent.
 
 Apps such as AIDA64 may read other APIs or cache results. Selecting an app does not guarantee that every value it displays changes. DeviceTest now shows separate readings from the added APIs so remaining gaps can be identified on the phone.
 
