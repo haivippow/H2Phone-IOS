@@ -12,7 +12,7 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
     grep -qi 'WSL2' /proc/sys/kernel/osrelease 2>/dev/null || fail 'WSL2 is required; this appears to be WSL1.'
 fi
 
-for tool in bash make git perl python3 dpkg-deb; do need "$tool"; done
+for tool in bash make git perl python3 dpkg-deb rsync; do need "$tool"; done
 export THEOS="${THEOS:-$HOME/theos}"
 [[ -f "$THEOS/makefiles/common.mk" ]] || fail "Theos missing at $THEOS. Install from https://theos.dev/docs/installation-linux"
 [[ -f "$THEOS/makefiles/aggregate.mk" ]] || fail 'Theos aggregate.mk is missing.'
@@ -39,10 +39,10 @@ PY
 done
 (( sdk_found )) || fail 'No iPhoneOS SDK >= 16.0 with UIKit headers in $THEOS/sdks. See docs/build-install.md'
 
-if ! find "$THEOS/toolchain" -type f \( -name clang -o -name clang++ \) -print -quit 2>/dev/null | grep -q . && ! command -v clang >/dev/null 2>&1; then
+if [[ ! -x "$THEOS/toolchain/linux/iphone/bin/clang" ]] && ! command -v clang >/dev/null 2>&1; then
     fail 'Theos iOS clang toolchain is missing. Re-run the official Theos installer.'
 fi
-if ! command -v ldid >/dev/null 2>&1 && ! find "$THEOS" -type f -name ldid -print -quit 2>/dev/null | grep -q .; then
+if [[ ! -x "$THEOS/toolchain/linux/iphone/bin/ldid" ]] && ! command -v ldid >/dev/null 2>&1; then
     fail 'ldid signing tool is missing. Re-run the official Theos installer.'
 fi
 
@@ -52,9 +52,16 @@ grep -Eq '^export TARGET = iphone:clang:latest:16\.0$' Makefile || fail 'Expecte
 
 mkdir -p packages
 marker="$(mktemp "$repo_root/packages/.build-start.XXXXXX")"
-trap 'rm -f -- "$marker"' EXIT
+build_dir="$(mktemp -d "${TMPDIR:-/tmp}/h2changer-build.XXXXXX")"
+trap 'rm -f -- "$marker"; rm -rf -- "$build_dir"' EXIT
+rsync -r --exclude='.git/' --exclude='.theos/' --exclude='packages/' "$repo_root/" "$build_dir/"
 printf 'Building rootless arm64 package...\n'
-make clean package FINALPACKAGE=1
+make -C "$build_dir" clean package FINALPACKAGE=1
+
+shopt -s nullglob
+for built_deb in "$build_dir"/packages/com.h2changer.ios_*.deb; do
+    cp -- "$built_deb" "$repo_root/packages/"
+done
 
 deb="$(find "$repo_root/packages" -maxdepth 1 -type f -name 'com.h2changer.ios_*.deb' -newer "$marker" -print | sort | tail -n 1)"
 [[ -n "$deb" && -s "$deb" ]] || fail 'Build finished without a new non-empty .deb in packages/.'
@@ -64,5 +71,5 @@ listing="$(dpkg-deb --contents "$deb")"
 for expected in 'H2Changer.app/H2Changer' 'DeviceTest.app/DeviceTest' 'H2ChangerHook.dylib' 'H2ChangerHook.plist'; do
     grep -Fq "$expected" <<< "$listing" || fail "Missing $expected in .deb."
 done
-grep -Fq './var/jb/' <<< "$listing" || fail 'Package does not contain rootless /var/jb paths.'
+grep -Fq 'var/jb/' <<< "$listing" || fail 'Package does not contain rootless /var/jb paths.'
 printf 'DEB_OK: %s\n' "$deb"
