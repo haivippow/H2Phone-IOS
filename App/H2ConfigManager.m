@@ -6,6 +6,11 @@ NSString * const H2TargetBundleID = @"com.h2phone.devicetest";
 NSString * const H2SafariBundleID = @"com.apple.mobilesafari";
 static NSString * const H2ConfigPath = @"/var/mobile/Library/Preferences/com.h2changer.config.plist";
 static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2changer.debug.log";
+static uint64_t const H2RuntimeMagic = 0x4832434800000000ULL;
+
+@interface H2ConfigManager ()
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *runtimeTokens;
+@end
 
 @implementation H2ConfigManager
 
@@ -41,6 +46,7 @@ static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2chan
     NSData *data = [NSPropertyListSerialization dataWithPropertyList:value format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
     if (!data || ![data writeToFile:H2ConfigPath options:NSDataWritingAtomic error:error]) return NO;
     notify_post(H2ConfigChangedNotification.UTF8String);
+    [self publishRuntimeState];
     [self appendLog:[NSString stringWithFormat:@"Config: %@ / %@", enabled ? @"ON" : @"OFF", profile]];
     return YES;
 }
@@ -62,14 +68,61 @@ static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2chan
     NSData *data = [NSPropertyListSerialization dataWithPropertyList:value format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
     if (!data || ![data writeToFile:H2ConfigPath options:NSDataWritingAtomic error:error]) return NO;
     notify_post(H2ConfigChangedNotification.UTF8String);
+    [self publishRuntimeState];
+    [self publishRuntimeStateForBundleID:bundleID];
     [self appendLog:[NSString stringWithFormat:@"App %@: %@", enabled ? @"enabled" : @"disabled", bundleID]];
     return YES;
 }
 
 - (BOOL)isFakeActiveForBundleID:(NSString *)bundleID {
     if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return NO;
+    return [[self effectiveConfigForBundleID:bundleID][@"enabled"] boolValue];
+}
+
+- (NSString *)runtimeNameForBundleID:(NSString *)bundleID {
+    return [@"com.h2changer.runtime." stringByAppendingString:bundleID];
+}
+
+- (int)runtimeTokenForBundleID:(NSString *)bundleID {
+    @synchronized (self) {
+        if (!self.runtimeTokens) self.runtimeTokens = [NSMutableDictionary dictionary];
+        NSNumber *cached = self.runtimeTokens[bundleID];
+        if (cached) return cached.intValue;
+        int token = -1;
+        if (notify_register_check([self runtimeNameForBundleID:bundleID].UTF8String, &token) != 0) return -1;
+        self.runtimeTokens[bundleID] = @(token);
+        return token;
+    }
+}
+
+- (void)publishRuntimeStateForBundleID:(NSString *)bundleID {
     NSDictionary *config = [self snapshot];
-    return [config[@"enabled"] boolValue] && [config[@"enabledApps"] containsObject:bundleID];
+    int token = [self runtimeTokenForBundleID:bundleID];
+    if (token < 0) return;
+    BOOL active = [config[@"enabled"] boolValue] && [config[@"enabledApps"] containsObject:bundleID];
+    NSString *profile = config[@"profile"];
+    uint64_t profileCode = [profile isEqualToString:@"iPhone 13 Pro Max"] ? 2 : ([profile isEqualToString:@"Test B"] ? 1 : 0);
+    uint64_t state = H2RuntimeMagic | (profileCode << 8) | (active ? 1 : 0);
+    notify_set_state(token, state);
+    notify_post([self runtimeNameForBundleID:bundleID].UTF8String);
+}
+
+- (void)publishRuntimeState {
+    for (NSString *bundleID in [self snapshot][@"enabledApps"]) [self publishRuntimeStateForBundleID:bundleID];
+}
+
+- (NSDictionary<NSString *, id> *)effectiveConfigForBundleID:(NSString *)bundleID {
+    NSDictionary *fallback = [self snapshot];
+    if (bundleID.length == 0) return @{ @"enabled": @(NO), @"profile": fallback[@"profile"] };
+    int token = [self runtimeTokenForBundleID:bundleID];
+    uint64_t state = 0;
+    if (token >= 0 && notify_get_state(token, &state) == 0 && (state & 0xffffffff00000000ULL) == H2RuntimeMagic) {
+        uint64_t code = (state >> 8) & 0xff;
+        NSString *profile = code == 2 ? @"iPhone 13 Pro Max" : (code == 1 ? @"Test B" : @"Test A");
+        return @{ @"enabled": @((state & 1) != 0), @"profile": profile };
+    }
+    BOOL active = [fallback[@"enabled"] boolValue] && [fallback[@"enabledApps"] containsObject:bundleID];
+    return @{ @"enabled": @(active), @"profile": fallback[@"profile"] };
 }
 
 - (void)appendLog:(NSString *)message {

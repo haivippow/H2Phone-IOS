@@ -13,6 +13,8 @@ FOUNDATION_EXPORT NSString * const H2SafariBundleID;
 - (BOOL)restoreOriginal:(NSError **)error;
 - (BOOL)setAppEnabled:(BOOL)enabled bundleID:(NSString *)bundleID error:(NSError **)error;
 - (BOOL)isFakeActiveForBundleID:(NSString *)bundleID;
+- (NSDictionary<NSString *, id> *)effectiveConfigForBundleID:(NSString *)bundleID;
+- (void)publishRuntimeState;
 - (void)appendLog:(NSString *)message;
 - (NSArray<NSString *> *)recentLogs;
 @end

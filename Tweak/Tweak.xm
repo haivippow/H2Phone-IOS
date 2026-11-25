@@ -11,11 +11,11 @@ static BOOL H2FakeEnabled(void) {
 }
 
 static BOOL H2ProfileB(void) {
-    return [[[[H2ConfigManager sharedManager] snapshot] objectForKey:@"profile"] isEqualToString:@"Test B"];
+    return [[[[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier] objectForKey:@"profile"] isEqualToString:@"Test B"];
 }
 
 static BOOL H2Profile13ProMax(void) {
-    return [[[[H2ConfigManager sharedManager] snapshot] objectForKey:@"profile"] isEqualToString:@"iPhone 13 Pro Max"];
+    return [[[[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier] objectForKey:@"profile"] isEqualToString:@"iPhone 13 Pro Max"];
 }
 
 %hook UIDevice
