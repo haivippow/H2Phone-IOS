@@ -8,39 +8,55 @@
 #import <dlfcn.h>
 #import <WebKit/WebKit.h>
 #import <objc/runtime.h>
+#import <AdSupport/AdSupport.h>
+#import <CoreLocation/CoreLocation.h>
+#import <CoreTelephony/CTCarrier.h>
+#import <CoreTelephony/CTTelephonyNetworkInfo.h>
+#import <CoreMotion/CoreMotion.h>
 
 static char H2OriginalUserAgentKey;
-static __thread BOOL H2SettingSafariUserAgent;
+static __thread BOOL H2SettingWebUserAgent;
+static __thread BOOL H2ReadingConfig;
+
+static NSDictionary<NSString *, id> *H2CurrentConfig(void) {
+    if (H2ReadingConfig) return nil;
+    H2ReadingConfig = YES;
+    NSDictionary *config = [[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier];
+    H2ReadingConfig = NO;
+    return config;
+}
 
 static BOOL H2FakeEnabled(void) {
-    return [[H2ConfigManager sharedManager] isFakeActiveForBundleID:[NSBundle mainBundle].bundleIdentifier];
+    NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
+    if (!bundleID.length || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return NO;
+    return [H2CurrentConfig()[@"enabled"] boolValue];
 }
 
 static NSDictionary<NSString *, NSString *> *H2Profile(void) {
-    NSString *name = [[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier][@"profile"];
+    NSString *name = H2CurrentConfig()[@"profile"];
     return [H2ConfigManager profileNamed:name];
 }
 
-static NSString *H2SafariUserAgent(void) {
+static NSString *H2WebUserAgent(void) {
     NSString *version = H2Profile()[@"ios"];
     NSString *cpuVersion = [version stringByReplacingOccurrencesOfString:@"." withString:@"_"];
     return [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/%@ Mobile/15E148 Safari/604.1", cpuVersion, version];
 }
 
-static void H2ApplySafariUserAgent(WKWebView *webView) {
+static void H2ApplyWebUserAgent(WKWebView *webView) {
     id original = objc_getAssociatedObject(webView, &H2OriginalUserAgentKey);
     if (H2FakeEnabled()) {
         if (!original) objc_setAssociatedObject(webView, &H2OriginalUserAgentKey, webView.customUserAgent ?: NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NSString *fake = H2SafariUserAgent();
+        NSString *fake = H2WebUserAgent();
         if (![webView.customUserAgent isEqualToString:fake]) {
-            H2SettingSafariUserAgent = YES;
+            H2SettingWebUserAgent = YES;
             webView.customUserAgent = fake;
-            H2SettingSafariUserAgent = NO;
+            H2SettingWebUserAgent = NO;
         }
     } else if (original) {
-        H2SettingSafariUserAgent = YES;
+        H2SettingWebUserAgent = YES;
         webView.customUserAgent = original == NSNull.null ? nil : original;
-        H2SettingSafariUserAgent = NO;
+        H2SettingWebUserAgent = NO;
         objc_setAssociatedObject(webView, &H2OriginalUserAgentKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
@@ -68,6 +84,124 @@ static void H2ApplySafariUserAgent(WKWebView *webView) {
     return [[NSUUID alloc] initWithUUIDString:uuid];
 }
 
+- (float)batteryLevel {
+    float original = %orig;
+    return H2FakeEnabled() && original >= 0 ? 0.85f : original;
+}
+
+- (UIDeviceBatteryState)batteryState {
+    UIDeviceBatteryState original = %orig;
+    return H2FakeEnabled() && original != UIDeviceBatteryStateUnknown ? UIDeviceBatteryStateUnplugged : original;
+}
+
+%end
+
+%hook ASIdentifierManager
+- (NSUUID *)advertisingIdentifier {
+    NSUUID *original = %orig;
+    if (!H2FakeEnabled() || !original || [original.UUIDString isEqualToString:@"00000000-0000-0000-0000-000000000000"]) return original;
+    return [[NSUUID alloc] initWithUUIDString:H2Profile()[@"idfa"]];
+}
+%end
+
+%hook CLLocation
+- (CLLocationCoordinate2D)coordinate {
+    if (!H2FakeEnabled()) return %orig;
+    return CLLocationCoordinate2DMake(21.0285, 105.8542);
+}
+%end
+
+%hook NSLocale
++ (NSLocale *)currentLocale {
+    if (!H2FakeEnabled()) return %orig;
+    return [NSLocale localeWithLocaleIdentifier:@"vi_VN"];
+}
++ (NSLocale *)autoupdatingCurrentLocale {
+    if (!H2FakeEnabled()) return %orig;
+    return [NSLocale localeWithLocaleIdentifier:@"vi_VN"];
+}
++ (NSArray<NSString *> *)preferredLanguages {
+    if (!H2FakeEnabled()) return %orig;
+    return @[@"vi-VN", @"en-US"];
+}
+%end
+
+%hook NSTimeZone
++ (NSTimeZone *)localTimeZone {
+    if (!H2FakeEnabled()) return %orig;
+    return [NSTimeZone timeZoneWithName:@"Asia/Ho_Chi_Minh"];
+}
++ (NSTimeZone *)systemTimeZone {
+    if (!H2FakeEnabled()) return %orig;
+    return [NSTimeZone timeZoneWithName:@"Asia/Ho_Chi_Minh"];
+}
+%end
+
+%hook CTCarrier
+- (NSString *)carrierName {
+    if (!H2FakeEnabled()) return %orig;
+    return @"Viettel";
+}
+- (NSString *)mobileCountryCode {
+    if (!H2FakeEnabled()) return %orig;
+    return @"452";
+}
+- (NSString *)mobileNetworkCode {
+    if (!H2FakeEnabled()) return %orig;
+    return @"04";
+}
+- (NSString *)isoCountryCode {
+    if (!H2FakeEnabled()) return %orig;
+    return @"vn";
+}
+%end
+
+%hook CTTelephonyNetworkInfo
+- (NSString *)currentRadioAccessTechnology {
+    NSString *original = %orig;
+    return H2FakeEnabled() && original ? CTRadioAccessTechnologyLTE : original;
+}
+- (NSDictionary<NSString *, NSString *> *)serviceCurrentRadioAccessTechnology {
+    NSDictionary<NSString *, NSString *> *original = %orig;
+    if (!H2FakeEnabled() || !original.count) return original;
+    NSMutableDictionary *fake = [NSMutableDictionary dictionaryWithCapacity:original.count];
+    for (NSString *service in original) fake[service] = CTRadioAccessTechnologyLTE;
+    return fake;
+}
+%end
+
+%hook CMAccelerometerData
+- (CMAcceleration)acceleration {
+    if (!H2FakeEnabled()) return %orig;
+    CMAcceleration value = { 0, 0, -1 };
+    return value;
+}
+%end
+
+%hook CMGyroData
+- (CMRotationRate)rotationRate {
+    if (!H2FakeEnabled()) return %orig;
+    CMRotationRate value = { 0, 0, 0 };
+    return value;
+}
+%end
+
+%hook CMDeviceMotion
+- (CMAcceleration)gravity {
+    if (!H2FakeEnabled()) return %orig;
+    CMAcceleration value = { 0, 0, -1 };
+    return value;
+}
+- (CMAcceleration)userAcceleration {
+    if (!H2FakeEnabled()) return %orig;
+    CMAcceleration value = { 0, 0, 0 };
+    return value;
+}
+- (CMRotationRate)rotationRate {
+    if (!H2FakeEnabled()) return %orig;
+    CMRotationRate value = { 0, 0, 0 };
+    return value;
+}
 %end
 
 %hook NSProcessInfo
@@ -133,38 +267,38 @@ static void H2ApplySafariUserAgent(WKWebView *webView) {
 }
 %end
 
-%group H2SafariUA
+%group H2WebUA
 %hook WKWebView
 
 - (instancetype)initWithFrame:(CGRect)frame configuration:(WKWebViewConfiguration *)configuration {
     WKWebView *webView = %orig;
-    if (webView) H2ApplySafariUserAgent(webView);
+    if (webView) H2ApplyWebUserAgent(webView);
     return webView;
 }
 
 - (WKNavigation *)loadRequest:(NSURLRequest *)request {
-    H2ApplySafariUserAgent(self);
+    H2ApplyWebUserAgent(self);
     return %orig;
 }
 
 - (WKNavigation *)loadHTMLString:(NSString *)string baseURL:(NSURL *)baseURL {
-    H2ApplySafariUserAgent(self);
+    H2ApplyWebUserAgent(self);
     return %orig;
 }
 
 - (WKNavigation *)reload {
-    H2ApplySafariUserAgent(self);
+    H2ApplyWebUserAgent(self);
     return %orig;
 }
 
 - (void)setCustomUserAgent:(NSString *)userAgent {
-    if (H2SettingSafariUserAgent) return %orig;
+    if (H2SettingWebUserAgent) return %orig;
     if (!H2FakeEnabled()) {
         objc_setAssociatedObject(self, &H2OriginalUserAgentKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return %orig;
     }
     objc_setAssociatedObject(self, &H2OriginalUserAgentKey, userAgent ?: NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    return %orig(H2SafariUserAgent());
+    return %orig(H2WebUserAgent());
 }
 
 %end
@@ -173,8 +307,13 @@ static void H2ApplySafariUserAgent(WKWebView *webView) {
 %ctor {
     NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
     if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return;
+    dlopen("/System/Library/Frameworks/AdSupport.framework/AdSupport", RTLD_LAZY);
+    dlopen("/System/Library/Frameworks/CoreLocation.framework/CoreLocation", RTLD_LAZY);
+    dlopen("/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony", RTLD_LAZY);
+    dlopen("/System/Library/Frameworks/CoreMotion.framework/CoreMotion", RTLD_LAZY);
+    dlopen("/System/Library/Frameworks/WebKit.framework/WebKit", RTLD_LAZY);
     %init;
-    if ([bundleID isEqualToString:H2SafariBundleID]) %init(H2SafariUA);
+    %init(H2WebUA);
     void *gestalt = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_LAZY);
     void *copyAnswer = gestalt ? dlsym(gestalt, "MGCopyAnswer") : NULL;
     if (copyAnswer) %init(H2MobileGestalt, MGCopyAnswer = copyAnswer);

@@ -16,10 +16,10 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
 
 + (NSArray<NSDictionary<NSString *, NSString *> *> *)profiles {
     return @[
-        @{ @"name": @"iPhone 13 Pro Max", @"model": @"iPhone14,3", @"board": @"D64AP", @"ios": @"17.7", @"uuid": @"9B625883-76C1-47D2-9D80-2EB2A397A134" },
-        @{ @"name": @"iPhone 14 Pro Max", @"model": @"iPhone15,3", @"board": @"D74AP", @"ios": @"17.6", @"uuid": @"B91D7391-E48A-47D4-A217-6A99A7E7C0B2" },
-        @{ @"name": @"iPhone 15 Pro Max", @"model": @"iPhone16,2", @"board": @"D84AP", @"ios": @"18.0", @"uuid": @"A729AE2B-9B2A-4DBF-8E45-4ACCC1F17608" },
-        @{ @"name": @"iPhone 16 Pro Max", @"model": @"iPhone17,2", @"board": @"D94AP", @"ios": @"18.1", @"uuid": @"85E8AB49-0F63-4E66-A854-C95126E85E1D" }
+        @{ @"name": @"iPhone 13 Pro Max", @"model": @"iPhone14,3", @"board": @"D64AP", @"ios": @"17.7", @"uuid": @"9B625883-76C1-47D2-9D80-2EB2A397A134", @"idfa": @"74CB69A9-1D45-4AAB-8A44-013A42E479B2" },
+        @{ @"name": @"iPhone 14 Pro Max", @"model": @"iPhone15,3", @"board": @"D74AP", @"ios": @"17.6", @"uuid": @"B91D7391-E48A-47D4-A217-6A99A7E7C0B2", @"idfa": @"0B8CE521-D67F-43E9-9CE1-91EAA4101C47" },
+        @{ @"name": @"iPhone 15 Pro Max", @"model": @"iPhone16,2", @"board": @"D84AP", @"ios": @"18.0", @"uuid": @"A729AE2B-9B2A-4DBF-8E45-4ACCC1F17608", @"idfa": @"D6BA9728-0FD5-42F3-AD91-381C56DC5F80" },
+        @{ @"name": @"iPhone 16 Pro Max", @"model": @"iPhone17,2", @"board": @"D94AP", @"ios": @"18.1", @"uuid": @"85E8AB49-0F63-4E66-A854-C95126E85E1D", @"idfa": @"E75DA473-C9B4-4863-9F0B-6D96944AFC31" }
     ];
 }
 

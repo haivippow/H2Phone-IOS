@@ -12,5 +12,5 @@ foreach ($item in $required) {
 $filter = Get-Content -Raw -LiteralPath (Join-Path $root 'Tweak/H2ChangerHook.plist')
 if ($filter -notmatch 'com\.apple\.UIKit') { throw 'Missing UIKit application filter' }
 $tweak = Get-Content -Raw -LiteralPath (Join-Path $root 'Tweak/Tweak.xm')
-if ($tweak -notmatch 'isFakeActiveForBundleID') { throw 'Missing per-app guard' }
+if ($tweak -notmatch 'H2CurrentConfig' -or $tweak -notmatch 'bundleID' -or $tweak -notmatch '\[@"enabled"\]') { throw 'Missing per-app guard' }
 Write-Host 'Structure and per-app guard OK'

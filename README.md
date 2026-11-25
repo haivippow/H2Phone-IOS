@@ -19,6 +19,8 @@ Safari appears in Test Apps and can be selected explicitly. Version 0.1.9 applie
 
 Apps such as AIDA64 may read other APIs or cache results. Selecting an app does not guarantee that every value it displays changes. DeviceTest now shows separate readings from the added APIs so remaining gaps can be identified on the phone.
 
+Version 0.1.10 adds selected-app hooks for IDFA (only when ATT already exposes a nonzero identifier), GPS coordinates (Hanoi), Vietnamese locale/time zone, Viettel carrier fields, LTE radio technology, battery level/state, and selected CoreMotion vectors. Public IP, IMEI, and full web fingerprinting are not spoofed by these hooks.
+
 ## Quick start
 
 Run setup and build commands using [docs/build-install.md](docs/build-install.md). On WSL2 Ubuntu 24.04, run `bash Scripts/build.sh`. A rootless `.deb` has been built in `packages/`; installation and behavior on an iPhone have not yet been tested.
