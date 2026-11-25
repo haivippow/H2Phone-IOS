@@ -1,6 +1,24 @@
 #import "H2TestController.h"
 #import <sys/sysctl.h>
 #import <sys/utsname.h>
+#import <dlfcn.h>
+
+static NSString *H2SysctlValue(const char *key) {
+    char value[128] = {0};
+    size_t size = sizeof(value);
+    return sysctlbyname(key, value, &size, NULL, 0) == 0 ? [NSString stringWithUTF8String:value] : @"(unavailable)";
+}
+
+static NSString *H2GestaltValue(CFStringRef key) {
+    void *library = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_LAZY);
+    CFTypeRef (*copyAnswer)(CFStringRef) = library ? dlsym(library, "MGCopyAnswer") : NULL;
+    if (!copyAnswer) return @"(unavailable)";
+    CFTypeRef answer = copyAnswer(key);
+    if (!answer) return @"(unavailable)";
+    NSString *value = [(__bridge id)answer description];
+    CFRelease(answer);
+    return value;
+}
 
 @interface H2TestController ()
 @property (nonatomic, copy) NSArray<NSArray<NSString *> *> *values;
@@ -17,9 +35,7 @@
 
 - (void)refreshValues {
     UIDevice *device = UIDevice.currentDevice;
-    char model[128] = {0};
-    size_t modelSize = sizeof(model);
-    NSString *machine = sysctlbyname("hw.machine", model, &modelSize, NULL, 0) == 0 ? [NSString stringWithUTF8String:model] : @"(unavailable)";
+    NSString *machine = H2SysctlValue("hw.machine");
     struct utsname systemInfo = {0};
     NSString *unameMachine = uname(&systemInfo) == 0 ? [NSString stringWithUTF8String:systemInfo.machine] : @"(unavailable)";
     self.values = @[
@@ -28,7 +44,12 @@
         @[@"System version", device.systemVersion ?: @"(nil)"],
         @[@"Identifier for vendor", device.identifierForVendor.UUIDString ?: @"(nil)"],
         @[@"Hardware model (sysctl)", machine ?: @"(nil)"],
-        @[@"Hardware model (uname)", unameMachine ?: @"(nil)"]
+        @[@"Hardware model (uname)", unameMachine ?: @"(nil)"],
+        @[@"Board (sysctl)", H2SysctlValue("hw.model")],
+        @[@"iOS (sysctl)", H2SysctlValue("kern.osproductversion")],
+        @[@"iOS (NSProcessInfo)", NSProcessInfo.processInfo.operatingSystemVersionString],
+        @[@"Board (MobileGestalt)", H2GestaltValue(CFSTR("HardwareModel"))],
+        @[@"iOS (MobileGestalt)", H2GestaltValue(CFSTR("ProductVersion"))]
     ];
     [self.tableView reloadData];
 }
