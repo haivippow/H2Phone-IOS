@@ -27,47 +27,73 @@ static __thread BOOL H2ReadingFilesystemProfile;
 static NSHashTable<WKWebView *> *H2TrackedWebViews;
 static int H2RuntimeNotificationToken = -1;
 
+static NSString *H2StringOrEmpty(id value) {
+    if ([value isKindOfClass:NSString.class]) return value;
+    if ([value respondsToSelector:@selector(stringValue)]) {
+        NSString *string = [value stringValue];
+        if ([string isKindOfClass:NSString.class]) return string;
+    }
+    return @"";
+}
+
+static const char *H2CStringOrEmpty(id value) {
+    return H2StringOrEmpty(value).UTF8String ?: "";
+}
+
+static BOOL H2IsExcludedBundle(NSString *bundleID) {
+    if (!bundleID.length || [bundleID isEqualToString:@"com.h2changer.app"]) return YES;
+    return [bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID];
+}
+
 static NSDictionary<NSString *, id> *H2CurrentConfig(void) {
     if (H2ReadingConfig) return nil;
     H2ReadingConfig = YES;
     NSDictionary *config = nil;
     @try {
-        config = [[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier];
+        NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
+        if (bundleID.length) config = [[H2ConfigManager sharedManager] effectiveConfigForBundleID:bundleID];
     } @finally {
         H2ReadingConfig = NO;
     }
-    return config;
+    return [config isKindOfClass:NSDictionary.class] ? config : nil;
 }
 
 static BOOL H2FakeEnabled(void) {
     if (H2ReadingConfig) return NO;
     NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
-    if (!bundleID.length || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return NO;
+    if (H2IsExcludedBundle(bundleID)) return NO;
     return [H2CurrentConfig()[@"enabled"] boolValue];
 }
 
 static NSDictionary<NSString *, id> *H2Profile(void) {
     if (H2ReadingConfig) return nil;
-    NSString *name = H2CurrentConfig()[@"profile"];
-    return [H2ConfigManager profileNamed:name];
+    NSString *name = H2StringOrEmpty(H2CurrentConfig()[@"profile"]);
+    if (!name.length) return nil;
+    NSDictionary *profile = [H2ConfigManager profileNamed:name];
+    return [profile isKindOfClass:NSDictionary.class] ? profile : nil;
 }
 
 static NSDictionary<NSString *, id> *H2EnabledProfile(void) {
     if (H2ReadingConfig) return nil;
     NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
-    if (!bundleID.length || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return nil;
+    if (H2IsExcludedBundle(bundleID)) return nil;
     NSDictionary *config = H2CurrentConfig();
     if (![config[@"enabled"] boolValue]) return nil;
-    return [H2ConfigManager profileNamed:config[@"profile"]];
+    NSString *name = H2StringOrEmpty(config[@"profile"]);
+    if (!name.length) return nil;
+    NSDictionary *profile = [H2ConfigManager profileNamed:name];
+    return [profile isKindOfClass:NSDictionary.class] ? profile : nil;
 }
 
 static NSString *H2WebUserAgentForProfile(NSDictionary<NSString *, id> *profile) {
-    NSString *version = profile[@"ios"];
+    NSString *version = H2StringOrEmpty(profile[@"ios"]);
+    if (!version.length) return nil;
     NSString *cpuVersion = [version stringByReplacingOccurrencesOfString:@"." withString:@"_"];
     return [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/%@ Mobile/15E148 Safari/604.1", cpuVersion, version];
 }
 
 static BOOL H2IsUserAgentKey(NSString *key) {
+    if (![key isKindOfClass:NSString.class]) return NO;
     NSString *normalized = key.lowercaseString;
     return [normalized isEqualToString:@"useragent"] || [normalized isEqualToString:@"user-agent"];
 }
@@ -84,47 +110,55 @@ static NSNumber *H2UnsignedNumber(id value) {
 }
 
 static BOOL H2IsDirectUserAgentScript(NSString *script) {
+    if (![script isKindOfClass:NSString.class]) return NO;
     NSString *normalized = [[script stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] stringByReplacingOccurrencesOfString:@";" withString:@""];
     return [normalized isEqualToString:@"navigator.userAgent"] || [normalized isEqualToString:@"window.navigator.userAgent"];
 }
 
-static NSDictionary *H2FakeSystemVersionDictionary(NSDictionary *original) {
-    if (!original) return original;
-    NSDictionary *profile = H2EnabledProfile();
-    if (!profile) return original;
+static NSDictionary *H2FakeSystemVersionDictionary(NSDictionary *original, NSDictionary<NSString *, id> *profile) {
+    if (!original || !profile) return original;
     NSMutableDictionary *fake = [original mutableCopy] ?: [NSMutableDictionary dictionary];
+    NSString *ios = H2StringOrEmpty(profile[@"ios"]);
+    NSString *build = H2StringOrEmpty(profile[@"build"]);
     fake[@"ProductName"] = @"iPhone OS";
-    if (profile[@"ios"]) fake[@"ProductVersion"] = profile[@"ios"];
-    if (profile[@"build"]) fake[@"ProductBuildVersion"] = profile[@"build"];
+    if (ios.length) fake[@"ProductVersion"] = ios;
+    if (build.length) fake[@"ProductBuildVersion"] = build;
     return fake;
 }
 
 static void H2ApplyWebUserAgent(WKWebView *webView) {
+    if (!webView) return;
     NSDictionary<NSString *, id> *profile = H2EnabledProfile();
     BOOL enabled = profile != nil;
     id original = objc_getAssociatedObject(webView, &H2OriginalUserAgentKey);
     if (enabled) {
         if (!original) objc_setAssociatedObject(webView, &H2OriginalUserAgentKey, webView.customUserAgent ?: NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         NSString *fake = H2WebUserAgentForProfile(profile);
-        if (![webView.customUserAgent isEqualToString:fake]) {
+        if (fake.length && ![webView.customUserAgent isEqualToString:fake]) {
             H2SettingWebUserAgent = YES;
-            webView.customUserAgent = fake;
-            H2SettingWebUserAgent = NO;
+            @try {
+                webView.customUserAgent = fake;
+            } @finally {
+                H2SettingWebUserAgent = NO;
+            }
         }
     } else if (original) {
         H2SettingWebUserAgent = YES;
-        webView.customUserAgent = original == NSNull.null ? nil : original;
-        H2SettingWebUserAgent = NO;
+        @try {
+            webView.customUserAgent = original == NSNull.null ? nil : original;
+        } @finally {
+            H2SettingWebUserAgent = NO;
+        }
         objc_setAssociatedObject(webView, &H2OriginalUserAgentKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    NSString *board = profile[@"board"] ?: @"";
+    NSString *board = H2StringOrEmpty(profile[@"board"]);
     NSUInteger seed = board.length > 1 ? [board characterAtIndex:1] : 1;
     H2UpdateWebFingerprint(webView, enabled ? H2WebUserAgentForProfile(profile) : @"", profile ?: @{}, seed, enabled);
 }
 
 static void H2ConfigureWebView(WKWebViewConfiguration *configuration) {
     NSDictionary<NSString *, id> *profile = H2EnabledProfile();
-    NSString *board = profile[@"board"] ?: @"";
+    NSString *board = H2StringOrEmpty(profile[@"board"]);
     NSUInteger seed = board.length > 1 ? [board characterAtIndex:1] : 1;
     H2ConfigureWebContent(configuration, profile ? H2WebUserAgentForProfile(profile) : @"", profile ?: @{}, seed, profile != nil);
 }
@@ -197,40 +231,39 @@ static void H2RefreshTrackedWebViews(void) {
 %hook NSDictionary
 + (instancetype)dictionaryWithContentsOfFile:(NSString *)path {
     NSDictionary *original = %orig;
-    return [path isEqualToString:@"/System/Library/CoreServices/SystemVersion.plist"] ? H2FakeSystemVersionDictionary(original) : original;
+    if (![path isEqualToString:@"/System/Library/CoreServices/SystemVersion.plist"]) return original;
+    return H2FakeSystemVersionDictionary(original, H2EnabledProfile());
 }
 - (instancetype)initWithContentsOfFile:(NSString *)path {
     NSDictionary *original = %orig;
-    return [path isEqualToString:@"/System/Library/CoreServices/SystemVersion.plist"] ? H2FakeSystemVersionDictionary(original) : original;
+    if (![path isEqualToString:@"/System/Library/CoreServices/SystemVersion.plist"]) return original;
+    return H2FakeSystemVersionDictionary(original, H2EnabledProfile());
 }
 %end
 
 %hook NSBundle
 - (id)objectForInfoDictionaryKey:(NSString *)key {
-    if ([self.bundlePath isEqualToString:@"/System/Library/CoreServices/SystemVersion.bundle"] && H2FakeEnabled()) {
-        if ([key isEqualToString:@"ProductVersion"]) return H2Profile()[@"ios"];
-        if ([key isEqualToString:@"ProductBuildVersion"]) return H2Profile()[@"build"];
-        if ([key isEqualToString:@"ProductName"]) return @"iPhone OS";
+    if ([self.bundlePath isEqualToString:@"/System/Library/CoreServices/SystemVersion.bundle"]) {
+        NSDictionary *profile = H2EnabledProfile();
+        if (profile) {
+            if ([key isEqualToString:@"ProductVersion"] && H2StringOrEmpty(profile[@"ios"]).length) return H2StringOrEmpty(profile[@"ios"]);
+            if ([key isEqualToString:@"ProductBuildVersion"] && H2StringOrEmpty(profile[@"build"]).length) return H2StringOrEmpty(profile[@"build"]);
+            if ([key isEqualToString:@"ProductName"]) return @"iPhone OS";
+        }
     }
     return %orig;
 }
 - (NSDictionary<NSString *, id> *)infoDictionary {
     NSDictionary *original = %orig;
-    return [self.bundlePath isEqualToString:@"/System/Library/CoreServices/SystemVersion.bundle"] ? H2FakeSystemVersionDictionary(original) : original;
+    if (![self.bundlePath isEqualToString:@"/System/Library/CoreServices/SystemVersion.bundle"]) return original;
+    return H2FakeSystemVersionDictionary(original, H2EnabledProfile());
 }
 %end
 
-static NSDictionary<NSFileAttributeKey, id> *H2FakeFilesystemAttributes(NSDictionary<NSFileAttributeKey, id> *original) {
-    if (!original || H2ReadingFilesystemProfile || H2ReadingConfig) return original;
-    NSDictionary *profile = nil;
-    H2ReadingFilesystemProfile = YES;
-    @try {
-        profile = H2EnabledProfile();
-    } @finally {
-        H2ReadingFilesystemProfile = NO;
-    }
-    if (!profile) return original;
+static NSDictionary<NSFileAttributeKey, id> *H2FakeFilesystemAttributes(NSDictionary<NSFileAttributeKey, id> *original, NSDictionary<NSString *, id> *profile) {
+    if (!original || !profile) return original;
     NSMutableDictionary *fake = [original mutableCopy];
+    if (!fake) return original;
     NSNumber *total = H2UnsignedNumber(profile[@"diskTotal"]);
     NSNumber *free = H2UnsignedNumber(profile[@"diskFree"]);
     if (total) fake[NSFileSystemSize] = total;
@@ -238,9 +271,12 @@ static NSDictionary<NSFileAttributeKey, id> *H2FakeFilesystemAttributes(NSDictio
     return fake;
 }
 
+static NSDictionary *H2FilesystemProfile(void);
+
 %hook NSFileManager
 - (NSDictionary<NSFileAttributeKey, id> *)attributesOfFileSystemForPath:(NSString *)path error:(NSError **)error {
-    return H2FakeFilesystemAttributes(%orig);
+    NSDictionary *original = %orig;
+    return H2FakeFilesystemAttributes(original, H2FilesystemProfile());
 }
 %end
 
@@ -388,20 +424,28 @@ static NSDictionary *H2FilesystemProfile(void) {
 
 %hook CTCarrier
 - (NSString *)carrierName {
-    if (!H2FakeEnabled()) return %orig;
-    return H2Profile()[@"carrier"];
+    NSDictionary *profile = H2EnabledProfile();
+    NSString *value = H2StringOrEmpty(profile[@"carrier"]);
+    if (!value.length) return %orig;
+    return value;
 }
 - (NSString *)mobileCountryCode {
-    if (!H2FakeEnabled()) return %orig;
-    return H2Profile()[@"mcc"];
+    NSDictionary *profile = H2EnabledProfile();
+    NSString *value = H2StringOrEmpty(profile[@"mcc"]);
+    if (!value.length) return %orig;
+    return value;
 }
 - (NSString *)mobileNetworkCode {
-    if (!H2FakeEnabled()) return %orig;
-    return H2Profile()[@"mnc"];
+    NSDictionary *profile = H2EnabledProfile();
+    NSString *value = H2StringOrEmpty(profile[@"mnc"]);
+    if (!value.length) return %orig;
+    return value;
 }
 - (NSString *)isoCountryCode {
-    if (!H2FakeEnabled()) return %orig;
-    return H2Profile()[@"country"];
+    NSDictionary *profile = H2EnabledProfile();
+    NSString *value = H2StringOrEmpty(profile[@"country"]);
+    if (!value.length) return %orig;
+    return value;
 }
 %end
 
@@ -415,8 +459,8 @@ static NSDictionary *H2FilesystemProfile(void) {
     if (!H2FakeEnabled()) return original;
     if (!original.count) return @{ @"H2ChangerPrimaryService": CTRadioAccessTechnologyLTE };
     NSMutableDictionary *fake = [NSMutableDictionary dictionaryWithCapacity:original.count];
-    for (NSString *service in original) fake[service] = CTRadioAccessTechnologyLTE;
-    return fake;
+    for (id service in original) if ([service isKindOfClass:NSString.class]) fake[service] = CTRadioAccessTechnologyLTE;
+    return fake.count ? fake : @{ @"H2ChangerPrimaryService": CTRadioAccessTechnologyLTE };
 }
 %end
 
@@ -568,13 +612,13 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
     int result = %orig;
     if (result == 0 && name) {
         NSDictionary *profile = H2EnabledProfile();
-        NSString *model = [profile[@"model"] isKindOfClass:NSString.class] ? profile[@"model"] : nil;
-        NSString *darwin = [profile[@"darwin"] isKindOfClass:NSString.class] ? profile[@"darwin"] : nil;
-        NSString *build = [profile[@"build"] isKindOfClass:NSString.class] ? profile[@"build"] : nil;
-        if (!model || !darwin || !build) return result;
-        snprintf(name->machine, sizeof(name->machine), "%s", model.UTF8String ?: "");
-        snprintf(name->release, sizeof(name->release), "%s", darwin.UTF8String ?: "");
-        snprintf(name->version, sizeof(name->version), "Darwin Kernel Version %s: H2Changer; root:xnu-%s/RELEASE_ARM64", darwin.UTF8String ?: "", build.UTF8String ?: "");
+        const char *model = H2CStringOrEmpty(profile[@"model"]);
+        const char *darwin = H2CStringOrEmpty(profile[@"darwin"]);
+        const char *build = H2CStringOrEmpty(profile[@"build"]);
+        if (!*model || !*darwin || !*build) return result;
+        snprintf(name->machine, sizeof(name->machine), "%s", model);
+        snprintf(name->release, sizeof(name->release), "%s", darwin);
+        snprintf(name->version, sizeof(name->version), "Darwin Kernel Version %s: H2Changer; root:xnu-%s/RELEASE_ARM64", darwin, build);
     }
     return result;
 }
@@ -669,7 +713,7 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
 
 %ctor {
     NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
-    if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return;
+    if (H2IsExcludedBundle(bundleID)) return;
     dlopen("/System/Library/Frameworks/AdSupport.framework/AdSupport", RTLD_LAZY);
     dlopen("/System/Library/Frameworks/CoreLocation.framework/CoreLocation", RTLD_LAZY);
     dlopen("/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony", RTLD_LAZY);
