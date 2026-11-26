@@ -10,7 +10,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"H2Changer";
+    self.title = @"H2PHONE";
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
     self.fakeSwitch = [UISwitch new];
     [self.fakeSwitch addTarget:self action:@selector(toggleFake:) forControlEvents:UIControlEventValueChanged];

@@ -40,7 +40,7 @@ static NSString *H2GestaltValue(CFStringRef key) {
 @implementation H2TestController
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"DeviceTest";
+    self.title = @"H2DEV";
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(refreshAll)];
     UIDevice.currentDevice.batteryMonitoringEnabled = YES;

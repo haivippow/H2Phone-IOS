@@ -1,4 +1,4 @@
-# H2Changer-iOS
+# H2PHONE iOS
 
 Native iPhone controller and isolated API test tweak for iPhone XS on iOS 16.1 with Dopamine rootless. The repository is independent of H2PHONE Android.
 
@@ -7,7 +7,7 @@ Native iPhone controller and isolated API test tweak for iPhone XS on iOS 16.1 w
 - `App/`: UIKit controller with Dashboard, installed user app selection, Profiles, Fake ON/OFF, Restore Original, and Debug Logs.
 - `Tweak/`: Logos hook, loaded in UIKit apps with a per-app allowlist check before returning fake values.
 - `App/H2ConfigManager.*`: file-based Config Manager; a future C# agent can write the same schema.
-- `DeviceTest/`: real UIKit app showing values returned by `UIDevice` APIs.
+- `DeviceTest/`: the H2DEV UIKit test app showing values returned by device and browser APIs.
 - `Scripts/`: local structure verification.
 - `docs/`: build, installation, and architecture notes.
 
