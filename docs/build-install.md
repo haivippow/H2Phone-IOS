@@ -1,70 +1,21 @@
-# Build on Windows with WSL2 Ubuntu
+# Build and install
 
-Target: iPhone XS, iOS 16.1, Dopamine rootless, Sileo. The `.deb` package architecture is `iphoneos-arm64`. The binaries are configured with `arm64` and `arm64e` slices because selected user apps use arm64 while MobileSafari is an arm64e platform binary on this target. Theos [documents arm64e deployment requirements](https://theos.dev/docs/arm64e-deployment). The build uses an iOS 16.0 deployment target and an SDK version 16.0 or newer; the installed toolchain must support the iOS 14+ arm64e ABI before Safari support can be claimed as verified.
+## Build with GitHub Actions
 
-## Environment status checked in this workspace
+Release packages are built on the macOS runner defined in `.github/workflows/release.yml`. No Ubuntu, WSL or local Theos installation is required on the Windows computer.
 
-The Windows host reports **Windows 10 Home Single Language, build 19045**. WSL2 Ubuntu 24.04, Theos, iPhoneOS16.5.sdk, clang and ldid were subsequently installed. `Scripts/build.sh` produces a rootless `.deb` in `packages/` and verifies its metadata and payload. Device behavior still requires testing on an iPhone.
+The workflow runs when a version tag matching `v*` is pushed. It installs Theos and packaging tools, builds the rootless arm64/arm64e package, and attaches the generated `.deb` to the matching GitHub Release.
 
-## Install WSL2 Ubuntu (run in an elevated PowerShell)
+1. Commit and push source changes to `develop`.
+2. Update the package version in `control`.
+3. Create and push the matching tag, for example `v0.1.23`.
+4. Open GitHub Actions and wait for **Build rootless release** to complete.
+5. Download the `.deb` from the matching GitHub Release.
 
-Windows 10 build 19045 supports WSL2. Follow [Microsoft's WSL install guide](https://learn.microsoft.com/en-us/windows/wsl/install). Use Ubuntu **24.04 LTS** for the current Theos Linux installer:
-
-```powershell
-wsl --install -d Ubuntu-24.04
-```
-
-Restart Windows, launch Ubuntu 24.04 once and create a Linux user. Verify with `wsl --list --verbose`; `Ubuntu-24.04` must show version **2**. If `wsl --install` only prints help, use [Microsoft's manual installation steps](https://learn.microsoft.com/en-us/windows/wsl/install-manual), including the two optional features, reboot, WSL2 kernel/update and Ubuntu installation. These commands require Administrator rights and are intentionally left for you to run.
-
-Ubuntu 26.04 (`resolute`) renamed the `libxml2` runtime package to `libxml2-16`. The current Theos installer still asks apt for `libxml2` and stops before installing Theos. Keep that distribution if you use it for other work; install `Ubuntu-24.04` alongside it for this build. [Ubuntu package listings](https://packages.ubuntu.com/search?keywords=libxml2&searchon=names&suite=all) show the version difference.
-
-## Install Theos in Ubuntu
-
-Start the supported distribution with `wsl -d Ubuntu-24.04` from PowerShell. Use the [official Theos Linux/WSL guide](https://theos.dev/docs/installation-linux). In Ubuntu 24.04:
-
-```sh
-sudo apt update
-sudo apt install -y bash curl sudo git make perl python3 dpkg-dev xz-utils
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
-export THEOS="$HOME/theos"
-```
-
-The Theos installer supplies its toolchain. Check `$THEOS/makefiles/common.mk`, `$THEOS/toolchain/`, and `ldid` before building. The official [Theos SDK repository](https://github.com/theos/sdks) offers iPhoneOS16.5.sdk. If the installer did not provide a suitable SDK, install this release asset:
-
-```sh
-mkdir -p "$THEOS/sdks"
-curl -fL -o /tmp/iPhoneOS16.5.sdk.tar.xz https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS16.5.sdk.tar.xz
-tar -xJf /tmp/iPhoneOS16.5.sdk.tar.xz -C "$THEOS/sdks"
-```
-
-## Build
-
-From Ubuntu, run the script against the Windows checkout:
-
-```sh
-cd /mnt/d/H2PHONE-IOS
-bash Scripts/build.sh
-```
-
-The script checks WSL2, Theos, SDK, toolchain, rootless settings and output package contents. It prints `DEB_OK: ...` only after a new non-empty `.deb` passes package ID, architecture and file checks. The output is in `/mnt/d/H2PHONE-IOS/packages/` (`D:\H2PHONE-IOS\packages` in Windows). `THEOS_PACKAGE_SCHEME=rootless` puts payload files under `/var/jb`.
+The workflow deletes old `packages/*.deb` files before each build, so only the package produced from the tagged commit is uploaded.
 
 ## Install on the iPhone
 
-Before installing H2Changer on Dopamine, check that **ElleKit** is installed in Sileo. If Sileo cannot resolve `ellekit`, add the [official ElleKit source](https://ellekit.space/) (`https://ellekit.space/`) and install ElleKit there, then retry the H2Changer package. H2Changer 0.1.1 depends on `ellekit` directly instead of the virtual package `mobilesubstrate`.
+Transfer the downloaded rootless `.deb` to the jailbroken iPhone and install it with Sileo or another compatible package manager. Restart the selected target app after changing its profile. For Safari, fully close and reopen Safari so newly created web views receive the document-start script.
 
-Copy the produced `.deb` to the phone, open it in Sileo, and install. Alternatively, with SSH configured:
-
-```sh
-scp packages/*.deb mobile@IPHONE_IP:/var/mobile/
-ssh mobile@IPHONE_IP 'sudo dpkg -i /var/mobile/com.h2changer.ios_*.deb && sudo uicache -a'
-```
-
-If the package filename differs, replace the wildcard with the actual name. Run `uicache -a` after install if the icons are absent. Launch H2Changer, select a profile, open Test Apps and select apps that should read fake values, then turn Fake ON. Tap the info button beside an app to open it. Close and reopen an app if it was already running before the tweak was installed. In DeviceTest, tap Refresh after each change. Turn Fake OFF or tap Restore Original, then refresh again to see original API results.
-
-For Safari testing, select Safari in Test Apps, turn Fake ON, then fully close and reopen Safari so new web views receive the document-start script. Visit an HTTP header echo page and compare its `User-Agent` with `navigator.userAgent` shown by a browser test page. Also check an iframe plus language, time-zone, and Canvas probes. Repeat after Fake OFF and reload the page/iframe; existing subframes are not live-updated by the public `WKWebView` evaluation API. The Safari hook remains experimental until verified on the target iPhone.
-
-## Verification
-
-On Windows, run `powershell -File Scripts/verify-structure.ps1` and `powershell -File Tests/SourceTests.ps1` for source/layout checks. On the iPhone, compare the model/OS, RAM/CPU, screen, carrier/location, Web UA, Web screen/hardware, WebGL and Canvas rows before enabling Fake, after enabling it, and after Restore Original. With Fake OFF, the values should match the initial readings. Other apps should read fake values only while selected in Test Apps. The tweak is injected into UIKit apps, so validate on a test phone before selecting more apps.
-
-If H2Changer reports a save error, inspect the controller app's entitlement signing and write access to `/var/mobile/Library/Preferences`. The config file is created on first save; no package script writes it.
+Device behavior must be verified on the target iPhone. A successful CI build proves compilation and packaging only; it does not prove that every private API or fingerprint path behaves identically on every iOS/jailbreak combination.

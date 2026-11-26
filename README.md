@@ -39,4 +39,4 @@ Full-process mode also overrides Darwin/kernel version, SystemVersion plist/bund
 
 ## Quick start
 
-Run setup and build commands using [docs/build-install.md](docs/build-install.md). On WSL2 Ubuntu 24.04, run `bash Scripts/build.sh`. A rootless `.deb` has been built in `packages/`; installation and behavior on an iPhone have not yet been tested.
+Build tagged releases with the macOS GitHub Actions workflow described in [docs/build-install.md](docs/build-install.md). Download the generated rootless `.deb` from GitHub Releases; no Ubuntu/WSL build environment is required.
