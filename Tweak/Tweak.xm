@@ -14,10 +14,13 @@
 #import <CoreTelephony/CTCarrier.h>
 #import <CoreTelephony/CTTelephonyNetworkInfo.h>
 #import <CoreMotion/CoreMotion.h>
+#import <notify.h>
 
 static char H2OriginalUserAgentKey;
 static __thread BOOL H2SettingWebUserAgent;
 static __thread BOOL H2ReadingConfig;
+static NSHashTable<WKWebView *> *H2TrackedWebViews;
+static int H2RuntimeNotificationToken = -1;
 
 static NSDictionary<NSString *, id> *H2CurrentConfig(void) {
     if (H2ReadingConfig) return nil;
@@ -33,22 +36,32 @@ static BOOL H2FakeEnabled(void) {
     return [H2CurrentConfig()[@"enabled"] boolValue];
 }
 
-static NSDictionary<NSString *, NSString *> *H2Profile(void) {
+static NSDictionary<NSString *, id> *H2Profile(void) {
     NSString *name = H2CurrentConfig()[@"profile"];
     return [H2ConfigManager profileNamed:name];
 }
 
-static NSString *H2WebUserAgent(void) {
-    NSString *version = H2Profile()[@"ios"];
+static NSDictionary<NSString *, id> *H2EnabledProfile(void) {
+    NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
+    if (!bundleID.length || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return nil;
+    NSDictionary *config = H2CurrentConfig();
+    if (![config[@"enabled"] boolValue]) return nil;
+    return [H2ConfigManager profileNamed:config[@"profile"]];
+}
+
+static NSString *H2WebUserAgentForProfile(NSDictionary<NSString *, id> *profile) {
+    NSString *version = profile[@"ios"];
     NSString *cpuVersion = [version stringByReplacingOccurrencesOfString:@"." withString:@"_"];
     return [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/%@ Mobile/15E148 Safari/604.1", cpuVersion, version];
 }
 
 static void H2ApplyWebUserAgent(WKWebView *webView) {
+    NSDictionary<NSString *, id> *profile = H2EnabledProfile();
+    BOOL enabled = profile != nil;
     id original = objc_getAssociatedObject(webView, &H2OriginalUserAgentKey);
-    if (H2FakeEnabled()) {
+    if (enabled) {
         if (!original) objc_setAssociatedObject(webView, &H2OriginalUserAgentKey, webView.customUserAgent ?: NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NSString *fake = H2WebUserAgent();
+        NSString *fake = H2WebUserAgentForProfile(profile);
         if (![webView.customUserAgent isEqualToString:fake]) {
             H2SettingWebUserAgent = YES;
             webView.customUserAgent = fake;
@@ -60,9 +73,27 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
         H2SettingWebUserAgent = NO;
         objc_setAssociatedObject(webView, &H2OriginalUserAgentKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    NSString *board = H2Profile()[@"board"];
+    NSString *board = profile[@"board"] ?: @"";
     NSUInteger seed = board.length > 1 ? [board characterAtIndex:1] : 1;
-    H2UpdateWebFingerprint(webView, H2WebUserAgent(), seed, H2FakeEnabled());
+    H2UpdateWebFingerprint(webView, enabled ? H2WebUserAgentForProfile(profile) : @"", profile ?: @{}, seed, enabled);
+}
+
+static void H2ConfigureWebView(WKWebViewConfiguration *configuration) {
+    NSDictionary<NSString *, id> *profile = H2EnabledProfile();
+    NSString *board = profile[@"board"] ?: @"";
+    NSUInteger seed = board.length > 1 ? [board characterAtIndex:1] : 1;
+    H2ConfigureWebContent(configuration, profile ? H2WebUserAgentForProfile(profile) : @"", profile ?: @{}, seed, profile != nil);
+}
+
+static void H2TrackWebView(WKWebView *webView) {
+    if (!webView) return;
+    @synchronized (H2TrackedWebViews) { [H2TrackedWebViews addObject:webView]; }
+}
+
+static void H2RefreshTrackedWebViews(void) {
+    NSArray<WKWebView *> *webViews;
+    @synchronized (H2TrackedWebViews) { webViews = H2TrackedWebViews.allObjects; }
+    for (WKWebView *webView in webViews) H2ApplyWebUserAgent(webView);
 }
 
 %hook UIDevice
@@ -75,6 +106,16 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
 - (NSString *)model {
     if (!H2FakeEnabled()) return %orig;
     return H2Profile()[@"name"];
+}
+
+- (NSString *)localizedModel {
+    if (!H2FakeEnabled()) return %orig;
+    return @"iPhone";
+}
+
+- (NSString *)systemName {
+    if (!H2FakeEnabled()) return %orig;
+    return @"iOS";
 }
 
 - (NSString *)systemVersion {
@@ -90,7 +131,7 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
 
 - (float)batteryLevel {
     float original = %orig;
-    return H2FakeEnabled() && original >= 0 ? 0.85f : original;
+    return H2FakeEnabled() && original >= 0 ? [H2Profile()[@"battery"] floatValue] : original;
 }
 
 - (UIDeviceBatteryState)batteryState {
@@ -98,6 +139,30 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
     return H2FakeEnabled() && original != UIDeviceBatteryStateUnknown ? UIDeviceBatteryStateUnplugged : original;
 }
 
+%end
+
+%hook UIScreen
+- (CGRect)bounds {
+    CGRect original = %orig;
+    if (!H2FakeEnabled() || self != UIScreen.mainScreen) return original;
+    NSDictionary *profile = H2Profile();
+    CGFloat width = [profile[@"screenWidth"] doubleValue];
+    CGFloat height = [profile[@"screenHeight"] doubleValue];
+    return original.size.width > original.size.height ? CGRectMake(0, 0, height, width) : CGRectMake(0, 0, width, height);
+}
+- (CGRect)nativeBounds {
+    if (!H2FakeEnabled() || self != UIScreen.mainScreen) return %orig;
+    NSDictionary *profile = H2Profile();
+    return CGRectMake(0, 0, [profile[@"nativeWidth"] doubleValue], [profile[@"nativeHeight"] doubleValue]);
+}
+- (CGFloat)scale {
+    if (!H2FakeEnabled() || self != UIScreen.mainScreen) return %orig;
+    return [H2Profile()[@"screenScale"] doubleValue];
+}
+- (CGFloat)nativeScale {
+    if (!H2FakeEnabled() || self != UIScreen.mainScreen) return %orig;
+    return [H2Profile()[@"screenScale"] doubleValue];
+}
 %end
 
 %hook ASIdentifierManager
@@ -111,8 +176,13 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
 %hook CLLocation
 - (CLLocationCoordinate2D)coordinate {
     if (!H2FakeEnabled()) return %orig;
-    return CLLocationCoordinate2DMake(21.0285, 105.8542);
+    return CLLocationCoordinate2DMake([H2Profile()[@"latitude"] doubleValue], [H2Profile()[@"longitude"] doubleValue]);
 }
+- (CLLocationDistance)altitude { if (!H2FakeEnabled()) return %orig; return 12.0; }
+- (CLLocationAccuracy)horizontalAccuracy { if (!H2FakeEnabled()) return %orig; return 5.0; }
+- (CLLocationAccuracy)verticalAccuracy { if (!H2FakeEnabled()) return %orig; return 8.0; }
+- (CLLocationSpeed)speed { if (!H2FakeEnabled()) return %orig; return 0.0; }
+- (CLLocationDirection)course { if (!H2FakeEnabled()) return %orig; return -1.0; }
 %end
 
 %hook NSLocale
@@ -144,19 +214,19 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
 %hook CTCarrier
 - (NSString *)carrierName {
     if (!H2FakeEnabled()) return %orig;
-    return @"Viettel";
+    return H2Profile()[@"carrier"];
 }
 - (NSString *)mobileCountryCode {
     if (!H2FakeEnabled()) return %orig;
-    return @"452";
+    return H2Profile()[@"mcc"];
 }
 - (NSString *)mobileNetworkCode {
     if (!H2FakeEnabled()) return %orig;
-    return @"04";
+    return H2Profile()[@"mnc"];
 }
 - (NSString *)isoCountryCode {
     if (!H2FakeEnabled()) return %orig;
-    return @"vn";
+    return H2Profile()[@"country"];
 }
 %end
 
@@ -210,6 +280,21 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
 
 %hook NSProcessInfo
 
+- (unsigned long long)physicalMemory {
+    if (!H2FakeEnabled()) return %orig;
+    return [H2Profile()[@"memory"] unsignedLongLongValue];
+}
+
+- (NSUInteger)processorCount {
+    if (!H2FakeEnabled()) return %orig;
+    return [H2Profile()[@"cores"] unsignedIntegerValue];
+}
+
+- (NSUInteger)activeProcessorCount {
+    if (!H2FakeEnabled()) return %orig;
+    return [H2Profile()[@"cores"] unsignedIntegerValue];
+}
+
 - (NSOperatingSystemVersion)operatingSystemVersion {
     if (!H2FakeEnabled()) return %orig;
     NSArray<NSString *> *parts = [H2Profile()[@"ios"] componentsSeparatedByString:@"."];
@@ -234,8 +319,25 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
 
 %end
 
+static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, size_t *oldlenp) {
+    if (!oldlenp) { errno = EINVAL; return -1; }
+    if (!oldp) { *oldlenp = valueSize; return 0; }
+    if (*oldlenp < valueSize) { *oldlenp = valueSize; errno = ENOMEM; return -1; }
+    memcpy(oldp, value, valueSize);
+    *oldlenp = valueSize;
+    return 0;
+}
+
 %hookf(int, sysctlbyname, const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
     if (!name || newp || !H2FakeEnabled()) return %orig;
+    if (strcmp(name, "hw.memsize") == 0) {
+        uint64_t memory = [H2Profile()[@"memory"] unsignedLongLongValue];
+        return H2CopySysctlScalar(&memory, sizeof(memory), oldp, oldlenp);
+    }
+    if (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0) {
+        int cores = [H2Profile()[@"cores"] intValue];
+        return H2CopySysctlScalar(&cores, sizeof(cores), oldp, oldlenp);
+    }
     NSString *value = nil;
     if (strcmp(name, "hw.machine") == 0) value = H2Profile()[@"model"];
     else if (strcmp(name, "hw.model") == 0) value = H2Profile()[@"board"];
@@ -268,6 +370,10 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
     else if (CFStringCompare(key, CFSTR("ProductVersion"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"ios"];
     else if (CFStringCompare(key, CFSTR("InternationalMobileEquipmentIdentity"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"imei"];
     else if (CFStringCompare(key, CFSTR("InternationalMobileEquipmentIdentity2"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"imei2"];
+    else if (CFStringCompare(key, CFSTR("DeviceClass"), 0) == kCFCompareEqualTo) answer = @"iPhone";
+    else if (CFStringCompare(key, CFSTR("DeviceName"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"name"];
+    else if (CFStringCompare(key, CFSTR("UserAssignedDeviceName"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"name"];
+    else if (CFStringCompare(key, CFSTR("CPUArchitecture"), 0) == kCFCompareEqualTo) answer = @"arm64";
     if (answer) return CFStringCreateCopy(kCFAllocatorDefault, (__bridge CFStringRef)answer);
     return %orig;
 }
@@ -277,17 +383,22 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
 %hook WKWebView
 
 - (instancetype)initWithFrame:(CGRect)frame configuration:(WKWebViewConfiguration *)configuration {
+    H2ConfigureWebView(configuration);
     WKWebView *webView = %orig;
-    if (webView) H2ApplyWebUserAgent(webView);
+    if (webView) {
+        H2TrackWebView(webView);
+        H2ApplyWebUserAgent(webView);
+    }
     return webView;
 }
 
 - (WKNavigation *)loadRequest:(NSURLRequest *)request {
     H2ApplyWebUserAgent(self);
     NSString *scheme = request.URL.scheme.lowercaseString;
-    if (H2FakeEnabled() && ([@"https" isEqualToString:scheme] || [@"http" isEqualToString:scheme])) {
+    NSDictionary<NSString *, id> *profile = H2EnabledProfile();
+    if (profile && ([@"https" isEqualToString:scheme] || [@"http" isEqualToString:scheme])) {
         NSMutableURLRequest *fakeRequest = [request mutableCopy];
-        [fakeRequest setValue:H2WebUserAgent() forHTTPHeaderField:@"User-Agent"];
+        [fakeRequest setValue:H2WebUserAgentForProfile(profile) forHTTPHeaderField:@"User-Agent"];
         return %orig(fakeRequest);
     }
     return %orig;
@@ -305,12 +416,13 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
 
 - (void)setCustomUserAgent:(NSString *)userAgent {
     if (H2SettingWebUserAgent) return %orig;
-    if (!H2FakeEnabled()) {
+    NSDictionary<NSString *, id> *profile = H2EnabledProfile();
+    if (!profile) {
         objc_setAssociatedObject(self, &H2OriginalUserAgentKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return %orig;
     }
     objc_setAssociatedObject(self, &H2OriginalUserAgentKey, userAgent ?: NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    return %orig(H2WebUserAgent());
+    return %orig(H2WebUserAgentForProfile(profile));
 }
 
 %end
@@ -324,6 +436,11 @@ static void H2ApplyWebUserAgent(WKWebView *webView) {
     dlopen("/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony", RTLD_LAZY);
     dlopen("/System/Library/Frameworks/CoreMotion.framework/CoreMotion", RTLD_LAZY);
     dlopen("/System/Library/Frameworks/WebKit.framework/WebKit", RTLD_LAZY);
+    H2TrackedWebViews = [NSHashTable weakObjectsHashTable];
+    NSString *runtimeName = [@"com.h2changer.runtime." stringByAppendingString:bundleID];
+    notify_register_dispatch(runtimeName.UTF8String, &H2RuntimeNotificationToken, dispatch_get_main_queue(), ^(int token) {
+        H2RefreshTrackedWebViews();
+    });
     %init;
     %init(H2WebUA);
     void *gestalt = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_LAZY);

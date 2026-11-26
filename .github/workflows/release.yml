@@ -1,0 +1,32 @@
+name: Build rootless release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install packaging tools
+        run: brew install ldid xz
+
+      - name: Install Theos
+        run: git clone --recursive https://github.com/theos/theos.git "$GITHUB_WORKSPACE/theos"
+
+      - name: Build arm64 and arm64e package
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: make clean package FINALPACKAGE=1
+
+      - name: Publish downloadable package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" packages/*.deb --target "${GITHUB_SHA}" --title "H2Changer ${GITHUB_REF_NAME}" --generate-notes

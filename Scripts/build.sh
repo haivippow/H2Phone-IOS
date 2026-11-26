@@ -47,7 +47,7 @@ if [[ ! -x "$THEOS/toolchain/linux/iphone/bin/ldid" ]] && ! command -v ldid >/de
 fi
 
 grep -Eq '^export THEOS_PACKAGE_SCHEME = rootless$' Makefile || fail 'Rootless scheme is not configured.'
-grep -Eq '^export ARCHS = arm64$' Makefile || fail 'Expected arm64 app/tweak target is not configured.'
+grep -Eq '^export ARCHS = arm64 arm64e$' Makefile || fail 'Expected arm64 and arm64e app/tweak targets are not configured.'
 grep -Eq '^export TARGET = iphone:clang:latest:16\.0$' Makefile || fail 'Expected iOS 16.0 deployment target is not configured.'
 
 mkdir -p packages
@@ -55,7 +55,7 @@ marker="$(mktemp "$repo_root/packages/.build-start.XXXXXX")"
 build_dir="$(mktemp -d "${TMPDIR:-/tmp}/h2changer-build.XXXXXX")"
 trap 'rm -f -- "$marker"; rm -rf -- "$build_dir"' EXIT
 rsync -r --exclude='.git/' --exclude='.theos/' --exclude='packages/' "$repo_root/" "$build_dir/"
-printf 'Building rootless arm64 package...\n'
+printf 'Building rootless arm64/arm64e package...\n'
 make -C "$build_dir" clean package FINALPACKAGE=1
 
 shopt -s nullglob

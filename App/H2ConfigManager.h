@@ -8,8 +8,8 @@ FOUNDATION_EXPORT NSString * const H2SafariBundleID;
 
 @interface H2ConfigManager : NSObject
 + (instancetype)sharedManager;
-+ (NSArray<NSDictionary<NSString *, NSString *> *> *)profiles;
-+ (NSDictionary<NSString *, NSString *> *)profileNamed:(NSString *)name;
++ (NSArray<NSDictionary<NSString *, id> *> *)profiles;
++ (NSDictionary<NSString *, id> *)profileNamed:(NSString *)name;
 - (NSDictionary<NSString *, id> *)snapshot;
 - (BOOL)saveEnabled:(BOOL)enabled profile:(NSString *)profile error:(NSError **)error;
 - (BOOL)restoreOriginal:(NSError **)error;

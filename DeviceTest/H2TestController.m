@@ -67,7 +67,7 @@ static NSString *H2GestaltValue(CFStringRef key) {
     self.webProbeGeneration++;
     NSUInteger generation = self.webProbeGeneration;
     self.webProbeStatus = @"Loading WebKit page";
-    self.webValues = @{ @"ua": @"(loading)", @"appVersion": @"(loading)", @"language": @"(loading)", @"timezone": @"(loading)", @"canvas": @"(loading)" };
+    self.webValues = @{ @"ua": @"(loading)", @"appVersion": @"(loading)", @"language": @"(loading)", @"timezone": @"(loading)", @"screen": @"(loading)", @"hardware": @"(loading)", @"webgl": @"(loading)", @"canvas": @"(loading)" };
     self.webNavigation = [self.webProbe loadHTMLString:@"<html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='font:14px -apple-system;padding:4px'>WebKit API probe</body></html>" baseURL:nil];
     [self refreshValues];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -78,7 +78,7 @@ static NSString *H2GestaltValue(CFStringRef key) {
         } else {
             NSMutableDictionary *updated = [self.webValues mutableCopy];
             BOOL timedOut = NO;
-            for (NSString *key in @[@"ua", @"appVersion", @"language", @"timezone", @"canvas"]) {
+            for (NSString *key in @[@"ua", @"appVersion", @"language", @"timezone", @"screen", @"hardware", @"webgl", @"canvas"]) {
                 if ([updated[key] isEqualToString:@"(loading)"]) {
                     updated[key] = @"(JavaScript timeout)";
                     timedOut = YES;
@@ -94,7 +94,7 @@ static NSString *H2GestaltValue(CFStringRef key) {
 }
 
 - (void)setWebProbeError:(NSString *)message {
-    self.webValues = @{ @"ua": message, @"appVersion": message, @"language": message, @"timezone": message, @"canvas": message };
+    self.webValues = @{ @"ua": message, @"appVersion": message, @"language": message, @"timezone": message, @"screen": message, @"hardware": message, @"webgl": message, @"canvas": message };
     [self refreshValues];
 }
 
@@ -116,6 +116,9 @@ static NSString *H2GestaltValue(CFStringRef key) {
     [self runWebScript:@"navigator.appVersion" key:@"appVersion"];
     [self runWebScript:@"navigator.language" key:@"language"];
     [self runWebScript:@"Intl.DateTimeFormat().resolvedOptions().timeZone" key:@"timezone"];
+    [self runWebScript:@"screen.width+'x'+screen.height+' @'+devicePixelRatio+'x'" key:@"screen"];
+    [self runWebScript:@"navigator.hardwareConcurrency+' cores / '+navigator.maxTouchPoints+' touches'" key:@"hardware"];
+    [self runWebScript:@"(function(){var c=document.createElement('canvas');var g=c.getContext('webgl');if(!g)return '(unavailable)';var e=g.getExtension('WEBGL_debug_renderer_info');return e?g.getParameter(e.UNMASKED_VENDOR_WEBGL)+' / '+g.getParameter(e.UNMASKED_RENDERER_WEBGL):'(extension unavailable)';})()" key:@"webgl"];
     [self runWebScript:@"(function(){var c=document.createElement('canvas');c.width=200;c.height=40;var x=c.getContext('2d');x.font='16px Arial';x.fillText('H2Canvas',8,24);var s=c.toDataURL();var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);})()" key:@"canvas"];
     [self refreshValues];
 }
@@ -167,6 +170,9 @@ static NSString *H2GestaltValue(CFStringRef key) {
         @[@"Board (sysctl)", H2SysctlValue("hw.model")],
         @[@"iOS (sysctl)", H2SysctlValue("kern.osproductversion")],
         @[@"iOS (NSProcessInfo)", NSProcessInfo.processInfo.operatingSystemVersionString],
+        @[@"RAM / CPU", [NSString stringWithFormat:@"%.0f MB / %lu cores", NSProcessInfo.processInfo.physicalMemory / 1048576.0, (unsigned long)NSProcessInfo.processInfo.processorCount]],
+        @[@"Screen points", [NSString stringWithFormat:@"%.0fx%.0f @%.1fx", UIScreen.mainScreen.bounds.size.width, UIScreen.mainScreen.bounds.size.height, UIScreen.mainScreen.scale]],
+        @[@"Screen pixels", [NSString stringWithFormat:@"%.0fx%.0f", UIScreen.mainScreen.nativeBounds.size.width, UIScreen.mainScreen.nativeBounds.size.height]],
         @[@"Board (MobileGestalt)", H2GestaltValue(CFSTR("HardwareModel"))],
         @[@"iOS (MobileGestalt)", H2GestaltValue(CFSTR("ProductVersion"))],
         @[@"IMEI 1 (MobileGestalt)", H2GestaltValue(CFSTR("InternationalMobileEquipmentIdentity"))],
@@ -185,6 +191,9 @@ static NSString *H2GestaltValue(CFStringRef key) {
         @[@"Web appVersion", self.webValues[@"appVersion"] ?: @"(loading)"],
         @[@"Web language", self.webValues[@"language"] ?: @"(loading)"],
         @[@"Web time zone", self.webValues[@"timezone"] ?: @"(loading)"],
+        @[@"Web screen", self.webValues[@"screen"] ?: @"(loading)"],
+        @[@"Web hardware", self.webValues[@"hardware"] ?: @"(loading)"],
+        @[@"WebGL", self.webValues[@"webgl"] ?: @"(loading)"],
         @[@"Canvas hash", self.webValues[@"canvas"] ?: @"(loading)"]
     ];
     [self.tableView reloadData];

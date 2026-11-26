@@ -15,7 +15,7 @@ The tweak changes values returned inside selected apps for `UIDevice.name`, `mod
 
 Profiles include iPhone 13 Pro Max (iOS 17.7), 14 Pro Max (iOS 17.6), 15 Pro Max (iOS 18.0), and 16 Pro Max (iOS 18.1). Each profile returns its matching model identifier through `sysctlbyname("hw.machine")` and `uname` inside selected apps. DeviceTest shows both values for verification. Fake OFF returns the original API values. These values do not upgrade the actual iOS installation.
 
-Safari appears in Test Apps and can be selected explicitly. Version 0.1.9 applies an experimental Safari `WKWebView` User-Agent override when Safari is selected and Fake is ON, including new loads and reloads. It restores the prior `WKWebView` User-Agent on Fake OFF. Safari uses separate WebKit processes, so both `navigator.userAgent` and the HTTP User-Agent header need on-device verification. Other JavaScript fingerprint values are outside this hook's scope.
+Safari appears in Test Apps and can be selected explicitly. The tweak attaches its `WKUserScript` to Safari's `WKWebViewConfiguration` before the web view is initialized; WebKit then transfers that document-start script to the separate WebContent process. It also applies the profile User-Agent to Safari loads while Fake is ON and restores the prior custom User-Agent after Fake is turned OFF. Both `navigator.userAgent` and the HTTP User-Agent header still require on-device verification.
 
 Apps such as AIDA64 may read other APIs or cache results. Selecting an app does not guarantee that every value it displays changes. DeviceTest now shows separate readings from the added APIs so remaining gaps can be identified on the phone.
 
@@ -26,6 +26,10 @@ Version 0.1.11 adds synthetic primary/secondary IMEI responses for the MobileGes
 Version 0.1.12 replaces the tiny background DeviceTest WebKit probe with a visible table header and shows navigation, JavaScript, process termination, or timeout errors per row.
 
 Version 0.1.12 also aligns `navigator.appVersion` with the selected iOS profile and sets the top-level WebKit request's User-Agent header. These affect values reported to websites, not the installed Safari/WebKit engine; a website can still detect iOS 16.1 through engine behavior.
+
+The current source safely JSON-encodes profile-controlled User-Agent text before embedding it in JavaScript and installs the fingerprint script before `WKWebView` initialization so the first document can receive it at document start. It does not call `WKUserContentController` from inside the WebContent process or hook version-specific WebKit C++ internals.
+
+Selected apps now consume one expanded profile for native model/OS identifiers, RAM/CPU, display dimensions, carrier, location and battery values. Their `WKWebView` pages consume the same profile for screen/DPR, CPU/touch counts, WebGL identity, User-Agent, locale/time zone and Canvas output. These are API-level overrides only; actual hardware, resource limits, WebKit engine, TLS and public IP remain unchanged.
 
 ## Quick start
 

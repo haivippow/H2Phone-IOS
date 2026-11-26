@@ -1,6 +1,6 @@
 # Build on Windows with WSL2 Ubuntu
 
-Target: iPhone XS, iOS 16.1, Dopamine rootless, Sileo. The `.deb` package architecture is `iphoneos-arm64`. All three binaries (H2Changer, DeviceTest and H2ChangerHook) use `arm64`. The tweak targets ordinary third-party apps, not an arm64e system binary, so an arm64e slice and the macOS-only new arm64e ABI toolchain are unnecessary. Theos [documents this distinction](https://theos.dev/docs/rootless). The build uses an iOS 16.0 deployment target and an SDK version 16.0 or newer; SDK 16.5 can build for iOS 16.1.
+Target: iPhone XS, iOS 16.1, Dopamine rootless, Sileo. The `.deb` package architecture is `iphoneos-arm64`. The binaries are configured with `arm64` and `arm64e` slices because selected user apps use arm64 while MobileSafari is an arm64e platform binary on this target. Theos [documents arm64e deployment requirements](https://theos.dev/docs/arm64e-deployment). The build uses an iOS 16.0 deployment target and an SDK version 16.0 or newer; the installed toolchain must support the iOS 14+ arm64e ABI before Safari support can be claimed as verified.
 
 ## Environment status checked in this workspace
 
@@ -61,10 +61,10 @@ ssh mobile@IPHONE_IP 'sudo dpkg -i /var/mobile/com.h2changer.ios_*.deb && sudo u
 
 If the package filename differs, replace the wildcard with the actual name. Run `uicache -a` after install if the icons are absent. Launch H2Changer, select a profile, open Test Apps and select apps that should read fake values, then turn Fake ON. Tap the info button beside an app to open it. Close and reopen an app if it was already running before the tweak was installed. In DeviceTest, tap Refresh after each change. Turn Fake OFF or tap Restore Original, then refresh again to see original API results.
 
-For Safari User-Agent testing, select Safari in Test Apps, turn Fake ON, then fully close and reopen Safari. Visit an HTTP header echo page and compare its `User-Agent` with `navigator.userAgent` shown by a browser test page. Repeat after Fake OFF. The Safari hook in 0.1.9 is experimental and must be verified on the target iPhone.
+For Safari testing, select Safari in Test Apps, turn Fake ON, then fully close and reopen Safari so new web views receive the document-start script. Visit an HTTP header echo page and compare its `User-Agent` with `navigator.userAgent` shown by a browser test page. Also check an iframe plus language, time-zone, and Canvas probes. Repeat after Fake OFF and reload the page/iframe; existing subframes are not live-updated by the public `WKWebView` evaluation API. The Safari hook remains experimental until verified on the target iPhone.
 
 ## Verification
 
-On Windows, run `powershell -File Scripts/verify-structure.ps1` for a source/layout check. On the iPhone, compare the four DeviceTest rows before enabling Fake, after enabling it, and after Restore Original. With Fake OFF, the values should match the initial readings. Other apps should read fake values only while selected in Test Apps. The tweak is injected into UIKit apps, so validate on a test phone before selecting more apps.
+On Windows, run `powershell -File Scripts/verify-structure.ps1` and `powershell -File Tests/SourceTests.ps1` for source/layout checks. On the iPhone, compare the model/OS, RAM/CPU, screen, carrier/location, Web UA, Web screen/hardware, WebGL and Canvas rows before enabling Fake, after enabling it, and after Restore Original. With Fake OFF, the values should match the initial readings. Other apps should read fake values only while selected in Test Apps. The tweak is injected into UIKit apps, so validate on a test phone before selecting more apps.
 
 If H2Changer reports a save error, inspect the controller app's entitlement signing and write access to `/var/mobile/Library/Preferences`. The config file is created on first save; no package script writes it.
