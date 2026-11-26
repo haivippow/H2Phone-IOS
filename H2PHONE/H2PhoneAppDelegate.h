@@ -1,4 +1,4 @@
 #import <UIKit/UIKit.h>
-@interface H2AppDelegate : UIResponder <UIApplicationDelegate>
+@interface H2PhoneAppDelegate : UIResponder <UIApplicationDelegate>
 @property (nonatomic, strong) UIWindow *window;
 @end

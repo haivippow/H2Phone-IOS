@@ -1,11 +1,13 @@
 #import "H2ConfigManager.h"
 #import <notify.h>
 
-NSString * const H2ConfigChangedNotification = @"com.h2changer.config.changed";
-NSString * const H2TargetBundleID = @"com.h2phone.devicetest";
+NSString * const H2ConfigChangedNotification = @"com.h2phone.config.changed";
+NSString * const H2TargetBundleID = @"com.h2phone.dev";
 NSString * const H2SafariBundleID = @"com.apple.mobilesafari";
-static NSString * const H2ConfigPath = @"/var/mobile/Library/Preferences/com.h2changer.config.plist";
-static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2changer.debug.log";
+static NSString * const H2ConfigPath = @"/var/mobile/Library/Preferences/com.h2phone.config.plist";
+static NSString * const H2LegacyConfigPath = @"/var/mobile/Library/Preferences/com.h2changer.config.plist";
+static NSString * const H2LogPath = @"/var/mobile/Library/Preferences/com.h2phone.debug.log";
+static NSString * const H2LegacyLogPath = @"/var/mobile/Library/Preferences/com.h2changer.debug.log";
 static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
 
 @interface H2ConfigManager ()
@@ -40,6 +42,7 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
 
 - (NSDictionary<NSString *, id> *)snapshot {
     NSDictionary *value = [NSDictionary dictionaryWithContentsOfFile:H2ConfigPath];
+    if (![value isKindOfClass:NSDictionary.class]) value = [NSDictionary dictionaryWithContentsOfFile:H2LegacyConfigPath];
     if (![value isKindOfClass:NSDictionary.class] || ![value[@"schema"] isEqual:@1]) {
         return @{ @"schema": @1, @"enabled": @(NO), @"profile": [H2ConfigManager profiles][0][@"name"], @"enabledApps": @[H2TargetBundleID] };
     }
@@ -49,7 +52,9 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
     if (![apps isKindOfClass:NSArray.class]) apps = @[H2TargetBundleID];
     NSMutableArray *validApps = [NSMutableArray array];
     for (id bundleID in apps) {
-        if ([bundleID isKindOfClass:NSString.class] && [bundleID length] > 0) [validApps addObject:bundleID];
+        if (![bundleID isKindOfClass:NSString.class] || [bundleID length] == 0) continue;
+        NSString *migrated = [bundleID isEqualToString:@"com.h2phone.devicetest"] ? H2TargetBundleID : bundleID;
+        if (![validApps containsObject:migrated]) [validApps addObject:migrated];
     }
     return @{ @"schema": @1, @"enabled": @([value[@"enabled"] boolValue]), @"profile": profile, @"enabledApps": validApps };
 }
@@ -74,7 +79,7 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
 }
 
 - (BOOL)setAppEnabled:(BOOL)enabled bundleID:(NSString *)bundleID error:(NSError **)error {
-    if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) {
+    if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2phone.app"]) {
         if (error) *error = [NSError errorWithDomain:@"H2Config" code:2 userInfo:@{NSLocalizedDescriptionKey: @"This app cannot be selected."}];
         return NO;
     }
@@ -92,12 +97,12 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
 }
 
 - (BOOL)isFakeActiveForBundleID:(NSString *)bundleID {
-    if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return NO;
+    if (bundleID.length == 0 || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2phone.app"]) return NO;
     return [[self effectiveConfigForBundleID:bundleID][@"enabled"] boolValue];
 }
 
 - (NSString *)runtimeNameForBundleID:(NSString *)bundleID {
-    return [@"com.h2changer.runtime." stringByAppendingString:bundleID];
+    return [@"com.h2phone.runtime." stringByAppendingString:bundleID];
 }
 
 - (int)runtimeTokenForBundleID:(NSString *)bundleID {
@@ -164,7 +169,9 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
 }
 
 - (NSArray<NSString *> *)recentLogs {
-    NSString *content = [NSString stringWithContentsOfFile:H2LogPath encoding:NSUTF8StringEncoding error:nil] ?: @"";
+    NSString *content = [NSString stringWithContentsOfFile:H2LogPath encoding:NSUTF8StringEncoding error:nil];
+    if (!content) content = [NSString stringWithContentsOfFile:H2LegacyLogPath encoding:NSUTF8StringEncoding error:nil];
+    content = content ?: @"";
     NSArray *lines = [content componentsSeparatedByString:@"\n"];
     NSUInteger start = lines.count > 100 ? lines.count - 100 : 0;
     return [lines subarrayWithRange:NSMakeRange(start, lines.count - start)];

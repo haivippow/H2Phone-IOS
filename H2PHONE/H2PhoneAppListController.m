@@ -1,13 +1,13 @@
-#import "H2AppListController.h"
+#import "H2PhoneAppListController.h"
 #import "H2ConfigManager.h"
 #import <objc/message.h>
 #import <dlfcn.h>
 
-@interface H2AppListController ()
+@interface H2PhoneAppListController ()
 @property (nonatomic, copy) NSArray<NSDictionary<NSString *, NSString *> *> *apps;
 @end
 
-@implementation H2AppListController
+@implementation H2PhoneAppListController
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Test Apps";
@@ -28,7 +28,7 @@
             NSString *bundleID = [proxy valueForKey:@"applicationIdentifier"];
             NSString *type = [proxy valueForKey:@"applicationType"];
             BOOL allowedSystemApp = [bundleID isEqualToString:H2TargetBundleID] || [bundleID isEqualToString:H2SafariBundleID];
-            if (![bundleID isKindOfClass:NSString.class] || (![type isEqualToString:@"User"] && !allowedSystemApp) || [bundleID isEqualToString:@"com.h2changer.app"]) continue;
+            if (![bundleID isKindOfClass:NSString.class] || (![type isEqualToString:@"User"] && !allowedSystemApp) || [bundleID isEqualToString:@"com.h2phone.app"]) continue;
             NSString *name = [proxy valueForKey:@"localizedName"];
             [items addObject:@{ @"id": bundleID, @"name": [name isKindOfClass:NSString.class] && name.length ? name : bundleID }];
         } @catch (NSException *exception) { continue; }

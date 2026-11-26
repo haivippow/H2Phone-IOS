@@ -1,11 +1,11 @@
-#import "H2AppDelegate.h"
-#import "H2MainController.h"
+#import "H2PhoneAppDelegate.h"
+#import "H2PhoneController.h"
 #import "H2ConfigManager.h"
 
-@implementation H2AppDelegate
+@implementation H2PhoneAppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     self.window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
-    self.window.rootViewController = [[UINavigationController alloc] initWithRootViewController:[H2MainController new]];
+    self.window.rootViewController = [[UINavigationController alloc] initWithRootViewController:[H2PhoneController new]];
     [self.window makeKeyAndVisible];
     [[H2ConfigManager sharedManager] publishRuntimeState];
     return YES;

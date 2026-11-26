@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $fingerprint = Get-Content -Raw (Join-Path $repoRoot 'Tweak/H2WebFingerprint.m')
 $tweak = Get-Content -Raw (Join-Path $repoRoot 'Tweak/Tweak.xm')
-$config = Get-Content -Raw (Join-Path $repoRoot 'App/H2ConfigManager.m')
+$config = Get-Content -Raw (Join-Path $repoRoot 'H2PHONE/H2ConfigManager.m')
 $rootMakefile = Get-Content -Raw (Join-Path $repoRoot 'Makefile')
 
 function Assert-SourceContains {
@@ -41,7 +41,7 @@ Assert-SourceContains $fingerprint 'forMainFrameOnly:NO' `
 Assert-SourceContains $fingerprint 'H2BrowserProfile\s*\(' `
     'Only a browser-safe subset of the native profile may be serialized into JavaScript.'
 
-$plist = Get-Content -Raw (Join-Path $repoRoot 'Tweak/H2ChangerHook.plist')
+$plist = Get-Content -Raw (Join-Path $repoRoot 'Tweak/H2PHONEHook.plist')
 Assert-SourceContains $plist 'com\.apple\.mobilesafari' `
     'The tweak filter must explicitly include MobileSafari.'
 

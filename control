@@ -1,9 +1,12 @@
-Package: com.h2changer.ios
+Package: com.h2phone.ios
 Name: H2PHONE iOS
-Version: 0.1.24
+Version: 0.1.25
 Architecture: iphoneos-arm64
 Description: Local device API test controller and isolated test tweak
-Maintainer: H2Changer
-Author: H2Changer
+Maintainer: H2PHONE
+Author: H2PHONE
 Section: Utilities
 Depends: firmware (>= 16.0), ellekit
+Conflicts: com.h2changer.ios
+Replaces: com.h2changer.ios
+Provides: com.h2changer.ios

@@ -1,8 +1,8 @@
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = H2ChangerHook
-H2ChangerHook_FILES = Tweak.xm H2WebFingerprint.m ../App/H2ConfigManager.m
-H2ChangerHook_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/App
-H2ChangerHook_FRAMEWORKS = UIKit Foundation WebKit AdSupport CoreLocation CoreTelephony CoreMotion SystemConfiguration
+TWEAK_NAME = H2PHONEHook
+H2PHONEHook_FILES = Tweak.xm H2WebFingerprint.m ../H2PHONE/H2ConfigManager.m
+H2PHONEHook_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/H2PHONE
+H2PHONEHook_FRAMEWORKS = UIKit Foundation WebKit AdSupport CoreLocation CoreTelephony CoreMotion SystemConfiguration
 
 include $(THEOS_MAKE_PATH)/tweak.mk

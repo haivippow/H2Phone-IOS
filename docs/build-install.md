@@ -8,7 +8,7 @@ The workflow runs when a version tag matching `v*` is pushed. It installs Theos 
 
 1. Commit and push source changes to `develop`.
 2. Update the package version in `control`.
-3. Create and push the matching tag, for example `v0.1.23`.
+3. Create and push the matching tag, for example `v0.1.25`.
 4. Open GitHub Actions and wait for **Build rootless release** to complete.
 5. Download the `.deb` from the matching GitHub Release.
 

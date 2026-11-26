@@ -1,7 +1,7 @@
 #import "H2WebFingerprint.h"
 #import <objc/runtime.h>
 
-static NSString * const H2ScriptMarker = @"/* H2Changer fingerprint */";
+static NSString * const H2ScriptMarker = @"/* H2PHONE fingerprint */";
 static char H2FingerprintAppliedKey;
 
 static NSString *H2JSONValue(id value, NSString *fallback) {
@@ -27,13 +27,13 @@ static NSDictionary<NSString *, id> *H2BrowserProfile(NSDictionary<NSString *, i
 
 NSString *H2WebFingerprintScript(NSString *userAgent, NSDictionary<NSString *, id> *profile, NSUInteger seed) {
     NSString *source =
-    @"/* H2Changer fingerprint */"
+    @"/* H2PHONE fingerprint */"
     @"(function(){try{"
     @"var n=__H2_PAYLOAD__;"
-    @"var s=window.__h2changerFingerprint;"
+    @"var s=window.__h2phoneFingerprint;"
     @"if(s){s.enabled=true;s.seed=n.seed;s.userAgent=n.userAgent;s.profile=n.profile;if(s.installed)return;}"
     @"else{s={enabled:true,installed:false,seed:n.seed,userAgent:n.userAgent,profile:n.profile};"
-    @"Object.defineProperty(window,'__h2changerFingerprint',{value:s,configurable:true});}"
+    @"Object.defineProperty(window,'__h2phoneFingerprint',{value:s,configurable:true});}"
     @"s.installed=true;s.restorers=[];"
     @"s.disable=function(){if(!s.installed){s.enabled=false;return;}s.enabled=false;"
     @"for(var i=s.restorers.length-1;i>=0;i--){try{s.restorers[i]();}catch(e){}}"
@@ -184,7 +184,7 @@ void H2UpdateWebFingerprint(WKWebView *webView, NSString *userAgent, NSDictionar
         if (webView.URL) [webView evaluateJavaScript:currentScript completionHandler:nil];
     } else if (wasApplied) {
         objc_setAssociatedObject(webView, &H2FingerprintAppliedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NSString *currentScript = @"if(window.__h2changerFingerprint){var s=window.__h2changerFingerprint;if(typeof s.disable==='function')s.disable();else s.enabled=false;}";
+        NSString *currentScript = @"if(window.__h2phoneFingerprint){var s=window.__h2phoneFingerprint;if(typeof s.disable==='function')s.disable();else s.enabled=false;}";
         if (webView.URL) [webView evaluateJavaScript:currentScript completionHandler:nil];
     }
 }

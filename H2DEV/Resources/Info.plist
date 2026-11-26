@@ -2,18 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
-<key>CFBundleExecutable</key><string>DeviceTest</string>
-<key>CFBundleIdentifier</key><string>com.h2phone.devicetest</string>
+<key>CFBundleExecutable</key><string>H2DEV</string>
+<key>CFBundleIdentifier</key><string>com.h2phone.dev</string>
 <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
 <key>CFBundleName</key><string>H2DEV</string>
 <key>CFBundleDisplayName</key><string>H2DEV</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.24</string>
+  <key>CFBundleShortVersionString</key><string>0.1.25</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>LSRequiresIPhoneOS</key><true/>
 <key>MinimumOSVersion</key><string>16.0</string>
 <key>UIDeviceFamily</key><array><integer>1</integer></array>
-<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>h2devicetest</string></array></dict></array>
+<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>h2dev</string></array></dict></array>
 <key>UILaunchScreen</key><dict/>
 <key>NSLocationWhenInUseUsageDescription</key><string>Show the location API value for device profile testing.</string>
 <key>NSMotionUsageDescription</key><string>Show motion sensor API values for device profile testing.</string>

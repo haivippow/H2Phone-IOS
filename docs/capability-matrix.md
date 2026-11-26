@@ -1,6 +1,6 @@
-# H2Changer capability matrix
+# H2PHONE capability matrix
 
-This file records what the current source can change, what it changes only partially, and what requires a different component. “Selected process” means Fake is ON and the process bundle ID is enabled in H2Changer.
+This file records what the current source can change, what it changes only partially, and what requires a different component. “Selected process” means Fake is ON and the process bundle ID is enabled in H2PHONE.
 
 ## Status meanings
 
@@ -13,7 +13,7 @@ This file records what the current source can change, what it changes only parti
 
 | Surface | Status | Current behavior and limits |
 | --- | --- | --- |
-| App selection and global Fake switch | Supported | Hooks return fake values only while Fake is ON and the current bundle ID is selected. H2Changer itself and unrelated Apple apps are excluded. |
+| App selection and global Fake switch | Supported | Hooks return fake values only while Fake is ON and the current bundle ID is selected. H2PHONE itself and unrelated Apple apps are excluded. |
 | Device name/model/iOS | Supported | Covers `UIDevice` name/model/localizedModel/systemName/systemVersion. |
 | Hardware model and board | Supported | Covers `sysctlbyname`, `uname`, and selected MobileGestalt model/board keys. |
 | OS version paths | Supported, high risk | Covers `UIDevice`, `NSProcessInfo`, `kern.osproductversion`, Darwin release/version, `uname`, MobileGestalt, and the system `SystemVersion.plist`/bundle. Full-process OS spoofing can make Apple frameworks choose incompatible code paths. |
@@ -73,6 +73,6 @@ This file records what the current source can change, what it changes only parti
 
 ## Verification rule
 
-An API-level fake is considered verified only after comparing Fake OFF, Fake ON, profile switching, and Restore Original on the target iPhone. A matching value in DeviceTest proves only that named API path; it does not prove that every third-party app or server sees the same result.
+An API-level fake is considered verified only after comparing Fake OFF, Fake ON, profile switching, and Restore Original on the target iPhone. A matching value in H2DEV proves only that named API path; it does not prove that every third-party app or server sees the same result.
 
 For an already-open document, Fake OFF invokes the injected state's `disable()` routine, restores saved JavaScript descriptors/methods in reverse order, and removes the H2 user script from future navigations. Re-enabling can install the wrappers again in the same document. Native hooks call their original implementation for subsequent queries while disabled; values an app already cached remain the app's responsibility.

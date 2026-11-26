@@ -2,7 +2,7 @@
 
 ## Intent
 
-Make H2Changer's existing web fingerprint profile reach Safari documents on a rootless iOS 16+ jailbreak, rather than only `WKWebView` objects created inside `MobileSafari` or ordinary selected apps.
+Make H2PHONE's existing web fingerprint profile reach Safari documents on a rootless iOS 16+ jailbreak, rather than only `WKWebView` objects created inside `MobileSafari` or ordinary selected apps.
 
 ## Goals
 

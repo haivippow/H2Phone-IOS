@@ -1,4 +1,4 @@
-#import "H2TestController.h"
+#import "H2DevController.h"
 #import <sys/sysctl.h>
 #import <sys/utsname.h>
 #import <dlfcn.h>
@@ -26,7 +26,7 @@ static NSString *H2GestaltValue(CFStringRef key) {
     return value;
 }
 
-@interface H2TestController () <CLLocationManagerDelegate, WKNavigationDelegate>
+@interface H2DevController () <CLLocationManagerDelegate, WKNavigationDelegate>
 @property (nonatomic, copy) NSArray<NSArray<NSString *> *> *values;
 @property (nonatomic, strong) CLLocationManager *locationManager;
 @property (nonatomic, strong) CMMotionManager *motionManager;
@@ -37,7 +37,7 @@ static NSString *H2GestaltValue(CFStringRef key) {
 @property (nonatomic) NSUInteger webProbeGeneration;
 @end
 
-@implementation H2TestController
+@implementation H2DevController
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"H2DEV";

@@ -52,13 +52,13 @@ const specialUA = `Mozilla/'quote'\\slash\u2028line\u2029end __SEED__ __UA_JSON_
 const firstContext = contextWithNavigator();
 vm.runInContext(buildScript(specialUA, profile, 511), firstContext);
 assert.equal(firstContext.navigator.userAgent, specialUA, 'special-character UA must round-trip');
-assert.equal(firstContext.window.__h2changerFingerprint.seed, 255, 'seed must be masked to one byte');
+assert.equal(firstContext.window.__h2phoneFingerprint.seed, 255, 'seed must be masked to one byte');
 assert.deepEqual([...firstContext.navigator.languages], ['vi-VN', 'en-US']);
 
 const replacementUA = 'replacement/2.0';
 vm.runInContext(buildScript(replacementUA, profile, 258), firstContext);
 assert.equal(firstContext.navigator.userAgent, replacementUA, 'existing state must update its UA');
-assert.equal(firstContext.window.__h2changerFingerprint.seed, 2, 'existing state must update its seed');
+assert.equal(firstContext.window.__h2phoneFingerprint.seed, 2, 'existing state must update its seed');
 assert.equal(firstContext.screen.width, 430, 'screen width must come from profile');
 assert.equal(firstContext.screen.height, 932, 'screen height must come from profile');
 assert.equal(firstContext.window.devicePixelRatio, 3, 'DPR must come from profile');

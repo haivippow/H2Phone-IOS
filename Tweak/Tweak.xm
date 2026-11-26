@@ -41,7 +41,7 @@ static const char *H2CStringOrEmpty(id value) {
 }
 
 static BOOL H2IsExcludedBundle(NSString *bundleID) {
-    if (!bundleID.length || [bundleID isEqualToString:@"com.h2changer.app"]) return YES;
+    if (!bundleID.length || [bundleID isEqualToString:@"com.h2phone.app"]) return YES;
     return [bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID];
 }
 
@@ -457,10 +457,10 @@ static NSDictionary *H2FilesystemProfile(void) {
 - (NSDictionary<NSString *, NSString *> *)serviceCurrentRadioAccessTechnology {
     NSDictionary<NSString *, NSString *> *original = %orig;
     if (!H2FakeEnabled()) return original;
-    if (!original.count) return @{ @"H2ChangerPrimaryService": CTRadioAccessTechnologyLTE };
+    if (!original.count) return @{ @"H2PHONEPrimaryService": CTRadioAccessTechnologyLTE };
     NSMutableDictionary *fake = [NSMutableDictionary dictionaryWithCapacity:original.count];
     for (id service in original) if ([service isKindOfClass:NSString.class]) fake[service] = CTRadioAccessTechnologyLTE;
-    return fake.count ? fake : @{ @"H2ChangerPrimaryService": CTRadioAccessTechnologyLTE };
+    return fake.count ? fake : @{ @"H2PHONEPrimaryService": CTRadioAccessTechnologyLTE };
 }
 %end
 
@@ -596,7 +596,7 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
     else if (strcmp(name, "hw.model") == 0) value = profile[@"board"];
     else if (strcmp(name, "kern.osproductversion") == 0) value = profile[@"ios"];
     else if (strcmp(name, "kern.osrelease") == 0) value = profile[@"darwin"];
-    else if (strcmp(name, "kern.version") == 0 && profile[@"darwin"] && profile[@"build"]) value = [NSString stringWithFormat:@"Darwin Kernel Version %@: H2Changer; root:xnu-%@/RELEASE_ARM64", profile[@"darwin"], profile[@"build"]];
+    else if (strcmp(name, "kern.version") == 0 && profile[@"darwin"] && profile[@"build"]) value = [NSString stringWithFormat:@"Darwin Kernel Version %@: H2PHONE; root:xnu-%@/RELEASE_ARM64", profile[@"darwin"], profile[@"build"]];
     if (!value) return %orig;
     const char *text = value.UTF8String;
     size_t required = strlen(text) + 1;
@@ -618,7 +618,7 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
         if (!*model || !*darwin || !*build) return result;
         snprintf(name->machine, sizeof(name->machine), "%s", model);
         snprintf(name->release, sizeof(name->release), "%s", darwin);
-        snprintf(name->version, sizeof(name->version), "Darwin Kernel Version %s: H2Changer; root:xnu-%s/RELEASE_ARM64", darwin, build);
+        snprintf(name->version, sizeof(name->version), "Darwin Kernel Version %s: H2PHONE; root:xnu-%s/RELEASE_ARM64", darwin, build);
     }
     return result;
 }
@@ -720,7 +720,7 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
     dlopen("/System/Library/Frameworks/CoreMotion.framework/CoreMotion", RTLD_LAZY);
     dlopen("/System/Library/Frameworks/WebKit.framework/WebKit", RTLD_LAZY);
     H2TrackedWebViews = [NSHashTable weakObjectsHashTable];
-    NSString *runtimeName = [@"com.h2changer.runtime." stringByAppendingString:bundleID];
+    NSString *runtimeName = [@"com.h2phone.runtime." stringByAppendingString:bundleID];
     notify_register_dispatch(runtimeName.UTF8String, &H2RuntimeNotificationToken, dispatch_get_main_queue(), ^(int token) {
         H2RefreshTrackedWebViews();
     });

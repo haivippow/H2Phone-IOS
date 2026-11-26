@@ -15,5 +15,5 @@
 1. Add failing tests for required profile fields and browser surfaces.
 2. Extend profile dictionaries and native hooks for device/display/memory/CPU/carrier/location/battery consistency.
 3. Extend WebKit script configuration for screen, DPR, CPU/touch, vendor and WebGL consistency.
-4. Expand DeviceTest probes and coverage documentation.
+4. Expand H2DEV probes and coverage documentation.
 5. Run source/JavaScript/structure verification; defer package build, commit, and push until requested.

@@ -15,4 +15,4 @@
 1. Add failing source checks for build/Darwin profile fields and new hook surfaces.
 2. Add kernel, uname, SystemVersion dictionary/bundle hooks.
 3. Add legacy UIWebView, User-Agent cache, and request-header hooks.
-4. Extend DeviceTest and documentation, run all host verification, review, then push `develop` without a release tag.
+4. Extend H2DEV and documentation, run all host verification, review, then push `develop` without a release tag.

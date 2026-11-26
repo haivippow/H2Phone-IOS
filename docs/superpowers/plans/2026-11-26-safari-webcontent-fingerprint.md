@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Inject H2Changer's existing fingerprint script into Safari WebContent documents on rootless iOS 16+ and safely encode the configured User-Agent.
+**Goal:** Inject H2PHONE's existing fingerprint script into Safari WebContent documents on rootless iOS 16+ and safely encode the configured User-Agent.
 
 **Architecture:** Extend tweak process targeting to Safari/WebContent while retaining runtime allow-listing, and make the script builder independently testable. Reuse `WKUserScript` at document start rather than binding to version-specific WebKit C++ symbols.
 
@@ -46,7 +46,7 @@
 ### Task 2: Safari pre-initialization targeting
 
 **Files:**
-- Modify: `Tweak/H2ChangerHook.plist`
+- Modify: `Tweak/H2PHONEHook.plist`
 - Modify: `Tweak/Tweak.xm`
 - Modify: `Tweak/Makefile`
 - Test: `Tests/SourceTests.ps1`

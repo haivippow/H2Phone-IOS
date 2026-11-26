@@ -1,12 +1,12 @@
-#import "H2MainController.h"
+#import "H2PhoneController.h"
 #import "H2ConfigManager.h"
-#import "H2AppListController.h"
+#import "H2PhoneAppListController.h"
 
-@interface H2MainController ()
+@interface H2PhoneController ()
 @property (nonatomic, strong) UISwitch *fakeSwitch;
 @end
 
-@implementation H2MainController
+@implementation H2PhoneController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -77,7 +77,7 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     if (indexPath.section == 1) {
-        [self.navigationController pushViewController:[H2AppListController new] animated:YES];
+        [self.navigationController pushViewController:[H2PhoneAppListController new] animated:YES];
     } else if (indexPath.section == 2) {
         NSError *error;
         NSString *profile = [H2ConfigManager profiles][indexPath.row][@"name"];
