@@ -1,4 +1,4 @@
-# Spoof coverage (0.1.13)
+# Spoof coverage (0.1.14)
 
 The tweak checks Fake ON and the current app bundle ID before returning profile values. Fake OFF calls the original API. Build and on-device status must be checked separately.
 
