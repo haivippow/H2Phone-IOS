@@ -230,7 +230,7 @@ static NSDictionary *H2FilesystemProfile(void) {
 }
 
 %hook NSURL
-- (BOOL)getResourceValue:(out id _Nullable *)value forKey:(NSURLResourceKey)key error:(NSError **)error {
+- (BOOL)getResourceValue:(id _Nullable *)value forKey:(NSURLResourceKey)key error:(NSError **)error {
     NSDictionary *profile = H2IsVolumeCapacityKey(key) ? H2FilesystemProfile() : nil;
     NSNumber *capacity = profile ? H2VolumeCapacityValue(key, profile) : nil;
     if (capacity) {
