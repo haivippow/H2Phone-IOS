@@ -1,4 +1,4 @@
-# Spoof coverage (0.1.16)
+# Spoof coverage (0.1.17)
 
 The tweak checks Fake ON and the current app bundle ID before returning profile values. Fake OFF calls the original API. Build and on-device status must be checked separately.
 
@@ -10,7 +10,7 @@ The tweak checks Fake ON and the current app bundle ID before returning profile 
 | IDFA | Profile UUID from `ASIdentifierManager.advertisingIdentifier` | All-zero value remains all zeros when tracking access is not granted. |
 | GPS | `CLLocation.coordinate` reports 21.0285, 105.8542 (Hanoi) | Does not move the radio or change server-derived location. Other location properties remain original. |
 | Locale / time zone | `vi_VN`, `vi-VN`, `Asia/Ho_Chi_Minh` | Does not change all JavaScript or system locale paths. |
-| Carrier / cellular radio | Viettel, MCC 452, MNC 04, ISO `vn`, LTE for existing radio services | Does not change SIM, Wi-Fi state, cellular connection, or public IP. |
+| Carrier / cellular radio | Viettel, MCC 452, MNC 04, ISO `vn`, and LTE; a stable synthetic service entry is returned when the radio-service dictionary is empty | Does not change SIM, Wi-Fi state, cellular connection, or public IP. |
 | Battery | 85% and unplugged when monitoring is enabled | Other battery/power APIs remain original. |
 | Motion | Selected acceleration, gravity, and rotation vector getters | Other sensor data and timestamps remain original. |
 | Memory / CPU | `NSProcessInfo` physical memory and CPU counts plus `hw.memsize`, `hw.ncpu`, `hw.physicalcpu`, and `hw.logicalcpu` | Does not change real resource limits, scheduling, performance, or jetsam behavior. |

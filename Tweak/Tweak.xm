@@ -297,12 +297,13 @@ static void H2RefreshTrackedWebViews(void) {
 
 %hook CTTelephonyNetworkInfo
 - (NSString *)currentRadioAccessTechnology {
-    NSString *original = %orig;
-    return H2FakeEnabled() && original ? CTRadioAccessTechnologyLTE : original;
+    if (H2FakeEnabled()) return CTRadioAccessTechnologyLTE;
+    return %orig;
 }
 - (NSDictionary<NSString *, NSString *> *)serviceCurrentRadioAccessTechnology {
     NSDictionary<NSString *, NSString *> *original = %orig;
-    if (!H2FakeEnabled() || !original.count) return original;
+    if (!H2FakeEnabled()) return original;
+    if (!original.count) return @{ @"H2ChangerPrimaryService": CTRadioAccessTechnologyLTE };
     NSMutableDictionary *fake = [NSMutableDictionary dictionaryWithCapacity:original.count];
     for (NSString *service in original) fake[service] = CTRadioAccessTechnologyLTE;
     return fake;
