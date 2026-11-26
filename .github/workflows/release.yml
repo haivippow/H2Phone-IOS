@@ -24,7 +24,9 @@ jobs:
       - name: Build arm64 and arm64e package
         env:
           THEOS: ${{ github.workspace }}/theos
-        run: make clean package FINALPACKAGE=1
+        run: |
+          rm -f packages/*.deb
+          make clean package FINALPACKAGE=1
 
       - name: Publish downloadable package
         env:

@@ -1,4 +1,4 @@
-# Spoof coverage (0.1.14)
+# Spoof coverage (0.1.15)
 
 The tweak checks Fake ON and the current app bundle ID before returning profile values. Fake OFF calls the original API. Build and on-device status must be checked separately.
 
@@ -13,7 +13,7 @@ The tweak checks Fake ON and the current app bundle ID before returning profile 
 | Battery | 85% and unplugged when monitoring is enabled | Other battery/power APIs remain original. |
 | Motion | Selected acceleration, gravity, and rotation vector getters | Other sensor data and timestamps remain original. |
 | Memory / CPU | `NSProcessInfo` physical memory and CPU counts plus `hw.memsize`, `hw.ncpu`, `hw.physicalcpu`, and `hw.logicalcpu` | Does not change real resource limits, scheduling, performance, or jetsam behavior. |
-| Display | `UIScreen` point/pixel bounds and scale from the selected device profile | Changing native screen metrics can affect responsive layout; it does not change the physical panel. |
+| Display | JavaScript `screen` dimensions and DPR use the selected profile; native `UIScreen` stays original | Keeping native geometry real prevents broken keyboards, safe areas, rotations, and app layouts. |
 | Web User-Agent | `WKWebView.customUserAgent` for selected apps | Safari and other apps require on-device verification; broader fingerprint properties remain original. |
 | IMEI 1 / 2 | Synthetic 15-digit values returned for two MobileGestalt IMEI keys in selected apps | Real modem and carrier IMEI are unchanged. Other IMEI APIs are not covered. |
 | Web fingerprint | A document-start, all-frames `WKUserScript` overrides JavaScript User-Agent, appVersion, language, time zone, screen/DPR, CPU/touch counts, WebGL debug vendor/renderer, and Canvas `getImageData`/`toDataURL` in selected `WKWebView` pages | Safari receives the script through its preconfigured web view; the tweak does not run `WKUserContentController` inside WebContent. Does not change the real WebKit engine or cover fonts, audio, `toBlob`, every canvas/WebGL path, TLS, or server-side fingerprinting. Requires on-device verification. |

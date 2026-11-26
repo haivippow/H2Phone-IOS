@@ -141,30 +141,6 @@ static void H2RefreshTrackedWebViews(void) {
 
 %end
 
-%hook UIScreen
-- (CGRect)bounds {
-    CGRect original = %orig;
-    if (!H2FakeEnabled() || self != UIScreen.mainScreen) return original;
-    NSDictionary *profile = H2Profile();
-    CGFloat width = [profile[@"screenWidth"] doubleValue];
-    CGFloat height = [profile[@"screenHeight"] doubleValue];
-    return original.size.width > original.size.height ? CGRectMake(0, 0, height, width) : CGRectMake(0, 0, width, height);
-}
-- (CGRect)nativeBounds {
-    if (!H2FakeEnabled() || self != UIScreen.mainScreen) return %orig;
-    NSDictionary *profile = H2Profile();
-    return CGRectMake(0, 0, [profile[@"nativeWidth"] doubleValue], [profile[@"nativeHeight"] doubleValue]);
-}
-- (CGFloat)scale {
-    if (!H2FakeEnabled() || self != UIScreen.mainScreen) return %orig;
-    return [H2Profile()[@"screenScale"] doubleValue];
-}
-- (CGFloat)nativeScale {
-    if (!H2FakeEnabled() || self != UIScreen.mainScreen) return %orig;
-    return [H2Profile()[@"screenScale"] doubleValue];
-}
-%end
-
 %hook ASIdentifierManager
 - (NSUUID *)advertisingIdentifier {
     NSUUID *original = %orig;

@@ -29,7 +29,7 @@ Version 0.1.12 also aligns `navigator.appVersion` with the selected iOS profile 
 
 The current source safely JSON-encodes profile-controlled User-Agent text before embedding it in JavaScript and installs the fingerprint script before `WKWebView` initialization so the first document can receive it at document start. It does not call `WKUserContentController` from inside the WebContent process or hook version-specific WebKit C++ internals.
 
-Selected apps now consume one expanded profile for native model/OS identifiers, RAM/CPU, display dimensions, carrier, location and battery values. Their `WKWebView` pages consume the same profile for screen/DPR, CPU/touch counts, WebGL identity, User-Agent, locale/time zone and Canvas output. These are API-level overrides only; actual hardware, resource limits, WebKit engine, TLS and public IP remain unchanged.
+Selected apps now consume one expanded profile for native model/OS identifiers, RAM/CPU, carrier, location and battery values. Native `UIScreen` geometry stays real so keyboards, safe areas and responsive layouts remain correct. Their `WKWebView` pages consume profile screen/DPR values only inside JavaScript, together with CPU/touch counts, WebGL identity, User-Agent, locale/time zone and Canvas output. These are API-level overrides only; actual hardware, resource limits, WebKit engine, TLS and public IP remain unchanged.
 
 ## Quick start
 

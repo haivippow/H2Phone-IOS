@@ -49,8 +49,14 @@ foreach ($key in @('memory', 'cores', 'screenWidth', 'screenHeight', 'screenScal
     Assert-SourceContains $config ('@"' + $key + '"') "Profiles must define $key."
 }
 Assert-SourceContains $tweak 'physicalMemory' 'Selected apps must receive profile physical memory.'
-Assert-SourceContains $tweak 'nativeBounds' 'Selected apps must receive profile native screen bounds.'
+if ($tweak -match '%hook\s+UIScreen') {
+    throw 'UIScreen must not be hooked because fake native bounds break app and Safari keyboard layout.'
+}
+Assert-SourceContains $fingerprint "prop\(Screen\.prototype,'width'" `
+    'Browser screen width must remain isolated to JavaScript.'
+Assert-SourceContains $fingerprint "prop\(window,'devicePixelRatio'" `
+    'Browser DPR must remain isolated to JavaScript.'
 Assert-SourceContains $tweak 'notify_register_dispatch' 'Open web views must refresh after runtime configuration changes.'
 Assert-SourceContains $rootMakefile 'ARCHS = arm64 arm64e' 'Safari support requires an arm64e tweak slice.'
 
-Write-Output 'Source tests passed: 22 assertions.'
+Write-Output 'Source tests passed: 26 assertions.'
