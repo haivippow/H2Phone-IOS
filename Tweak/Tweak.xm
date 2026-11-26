@@ -30,8 +30,12 @@ static int H2RuntimeNotificationToken = -1;
 static NSDictionary<NSString *, id> *H2CurrentConfig(void) {
     if (H2ReadingConfig) return nil;
     H2ReadingConfig = YES;
-    NSDictionary *config = [[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier];
-    H2ReadingConfig = NO;
+    NSDictionary *config = nil;
+    @try {
+        config = [[H2ConfigManager sharedManager] effectiveConfigForBundleID:[NSBundle mainBundle].bundleIdentifier];
+    } @finally {
+        H2ReadingConfig = NO;
+    }
     return config;
 }
 
@@ -85,12 +89,13 @@ static BOOL H2IsDirectUserAgentScript(NSString *script) {
 }
 
 static NSDictionary *H2FakeSystemVersionDictionary(NSDictionary *original) {
-    if (!original || !H2FakeEnabled()) return original;
+    if (!original) return original;
+    NSDictionary *profile = H2EnabledProfile();
+    if (!profile) return original;
     NSMutableDictionary *fake = [original mutableCopy] ?: [NSMutableDictionary dictionary];
-    NSDictionary *profile = H2Profile();
     fake[@"ProductName"] = @"iPhone OS";
-    fake[@"ProductVersion"] = profile[@"ios"];
-    fake[@"ProductBuildVersion"] = profile[@"build"];
+    if (profile[@"ios"]) fake[@"ProductVersion"] = profile[@"ios"];
+    if (profile[@"build"]) fake[@"ProductBuildVersion"] = profile[@"build"];
     return fake;
 }
 
@@ -138,8 +143,10 @@ static void H2RefreshTrackedWebViews(void) {
 %hook UIDevice
 
 - (NSString *)name {
-    if (!H2FakeEnabled()) return %orig;
-    return H2Profile()[@"name"];
+    NSDictionary *profile = H2EnabledProfile();
+    NSString *value = profile[@"name"];
+    if (!value) return %orig;
+    return value;
 }
 
 - (NSString *)model {
@@ -158,14 +165,16 @@ static void H2RefreshTrackedWebViews(void) {
 }
 
 - (NSString *)systemVersion {
-    if (!H2FakeEnabled()) return %orig;
-    return H2Profile()[@"ios"];
+    NSDictionary *profile = H2EnabledProfile();
+    NSString *value = profile[@"ios"];
+    if (!value) return %orig;
+    return value;
 }
 
 - (NSUUID *)identifierForVendor {
     NSUUID *original = %orig;
-    if (!H2FakeEnabled()) return original;
-    NSString *uuid = H2Profile()[@"uuid"];
+    NSDictionary *profile = H2EnabledProfile();
+    NSString *uuid = profile[@"uuid"];
     if (![uuid isKindOfClass:NSString.class] || uuid.length == 0) return original;
     NSUUID *fake = [[NSUUID alloc] initWithUUIDString:uuid];
     return fake ?: original;
@@ -173,7 +182,9 @@ static void H2RefreshTrackedWebViews(void) {
 
 - (float)batteryLevel {
     float original = %orig;
-    return H2FakeEnabled() && original >= 0 ? [H2Profile()[@"battery"] floatValue] : original;
+    NSDictionary *profile = H2EnabledProfile();
+    NSNumber *battery = [profile[@"battery"] isKindOfClass:NSNumber.class] ? profile[@"battery"] : nil;
+    return profile && battery && original >= 0 ? battery.floatValue : original;
 }
 
 - (UIDeviceBatteryState)batteryState {
@@ -210,10 +221,14 @@ static void H2RefreshTrackedWebViews(void) {
 %end
 
 static NSDictionary<NSFileAttributeKey, id> *H2FakeFilesystemAttributes(NSDictionary<NSFileAttributeKey, id> *original) {
-    if (!original || H2ReadingFilesystemProfile) return original;
+    if (!original || H2ReadingFilesystemProfile || H2ReadingConfig) return original;
+    NSDictionary *profile = nil;
     H2ReadingFilesystemProfile = YES;
-    NSDictionary *profile = H2EnabledProfile();
-    H2ReadingFilesystemProfile = NO;
+    @try {
+        profile = H2EnabledProfile();
+    } @finally {
+        H2ReadingFilesystemProfile = NO;
+    }
     if (!profile) return original;
     NSMutableDictionary *fake = [original mutableCopy];
     NSNumber *total = H2UnsignedNumber(profile[@"diskTotal"]);
@@ -242,10 +257,14 @@ static NSNumber *H2VolumeCapacityValue(NSURLResourceKey key, NSDictionary *profi
 }
 
 static NSDictionary *H2FilesystemProfile(void) {
-    if (H2ReadingFilesystemProfile) return nil;
+    if (H2ReadingFilesystemProfile || H2ReadingConfig) return nil;
+    NSDictionary *profile = nil;
     H2ReadingFilesystemProfile = YES;
-    NSDictionary *profile = H2EnabledProfile();
-    H2ReadingFilesystemProfile = NO;
+    @try {
+        profile = H2EnabledProfile();
+    } @finally {
+        H2ReadingFilesystemProfile = NO;
+    }
     return profile;
 }
 
@@ -320,8 +339,9 @@ static NSDictionary *H2FilesystemProfile(void) {
 %hook ASIdentifierManager
 - (NSUUID *)advertisingIdentifier {
     NSUUID *original = %orig;
-    if (!H2FakeEnabled() || !original || [original.UUIDString isEqualToString:@"00000000-0000-0000-0000-000000000000"]) return original;
-    NSString *idfa = H2Profile()[@"idfa"];
+    NSDictionary *profile = H2EnabledProfile();
+    if (!profile || !original || [original.UUIDString isEqualToString:@"00000000-0000-0000-0000-000000000000"]) return original;
+    NSString *idfa = profile[@"idfa"];
     if (![idfa isKindOfClass:NSString.class] || idfa.length == 0) return original;
     NSUUID *fake = [[NSUUID alloc] initWithUUIDString:idfa];
     return fake ?: original;
@@ -437,8 +457,9 @@ static NSDictionary *H2FilesystemProfile(void) {
 %hook NSProcessInfo
 
 - (NSTimeInterval)systemUptime {
-    if (!H2FakeEnabled()) return %orig;
-    return [H2Profile()[@"uptime"] doubleValue];
+    NSDictionary *profile = H2EnabledProfile();
+    if (!profile) return %orig;
+    return [profile[@"uptime"] doubleValue];
 }
 
 - (NSProcessInfoThermalState)thermalState {
@@ -452,23 +473,28 @@ static NSDictionary *H2FilesystemProfile(void) {
 }
 
 - (unsigned long long)physicalMemory {
-    if (!H2FakeEnabled()) return %orig;
-    return [H2Profile()[@"memory"] unsignedLongLongValue];
+    NSDictionary *profile = H2EnabledProfile();
+    if (!profile) return %orig;
+    return [profile[@"memory"] unsignedLongLongValue];
 }
 
 - (NSUInteger)processorCount {
-    if (!H2FakeEnabled()) return %orig;
-    return [H2Profile()[@"cores"] unsignedIntegerValue];
+    NSDictionary *profile = H2EnabledProfile();
+    if (!profile) return %orig;
+    return [profile[@"cores"] unsignedIntegerValue];
 }
 
 - (NSUInteger)activeProcessorCount {
-    if (!H2FakeEnabled()) return %orig;
-    return [H2Profile()[@"cores"] unsignedIntegerValue];
+    NSDictionary *profile = H2EnabledProfile();
+    if (!profile) return %orig;
+    return [profile[@"cores"] unsignedIntegerValue];
 }
 
 - (NSOperatingSystemVersion)operatingSystemVersion {
-    if (!H2FakeEnabled()) return %orig;
-    NSArray<NSString *> *parts = [H2Profile()[@"ios"] componentsSeparatedByString:@"."];
+    NSDictionary *profile = H2EnabledProfile();
+    NSString *ios = profile[@"ios"];
+    if (!ios) return %orig;
+    NSArray<NSString *> *parts = [ios componentsSeparatedByString:@"."];
     NSOperatingSystemVersion version = { parts.count > 0 ? parts[0].integerValue : 0,
         parts.count > 1 ? parts[1].integerValue : 0,
         parts.count > 2 ? parts[2].integerValue : 0 };
@@ -476,8 +502,10 @@ static NSDictionary *H2FilesystemProfile(void) {
 }
 
 - (NSString *)operatingSystemVersionString {
-    if (!H2FakeEnabled()) return %orig;
-    return [@"Version " stringByAppendingString:H2Profile()[@"ios"]];
+    NSDictionary *profile = H2EnabledProfile();
+    NSString *ios = profile[@"ios"];
+    if (!ios) return %orig;
+    return [@"Version " stringByAppendingString:ios];
 }
 
 - (BOOL)isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion)version {
@@ -500,29 +528,31 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
 }
 
 %hookf(int, sysctlbyname, const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
-    if (!name || newp || !H2FakeEnabled()) return %orig;
+    if (!name || newp) return %orig;
+    NSDictionary *profile = H2EnabledProfile();
+    if (!profile) return %orig;
     if (strcmp(name, "hw.memsize") == 0) {
-        uint64_t memory = [H2Profile()[@"memory"] unsignedLongLongValue];
+        uint64_t memory = [profile[@"memory"] unsignedLongLongValue];
         return H2CopySysctlScalar(&memory, sizeof(memory), oldp, oldlenp);
     }
     if (strcmp(name, "hw.ncpu") == 0 || strcmp(name, "hw.physicalcpu") == 0 || strcmp(name, "hw.logicalcpu") == 0) {
-        int cores = [H2Profile()[@"cores"] intValue];
+        int cores = [profile[@"cores"] intValue];
         return H2CopySysctlScalar(&cores, sizeof(cores), oldp, oldlenp);
     }
     if (strcmp(name, "kern.boottime") == 0) {
         NSTimeInterval now = NSDate.date.timeIntervalSince1970;
-        NSTimeInterval uptime = [H2Profile()[@"uptime"] doubleValue];
+        NSTimeInterval uptime = [profile[@"uptime"] doubleValue];
         if (!isfinite(uptime) || uptime < 0) uptime = 0;
         if (uptime > now) uptime = now;
         struct timeval boot = { (time_t)(now - uptime), 0 };
         return H2CopySysctlScalar(&boot, sizeof(boot), oldp, oldlenp);
     }
     NSString *value = nil;
-    if (strcmp(name, "hw.machine") == 0) value = H2Profile()[@"model"];
-    else if (strcmp(name, "hw.model") == 0) value = H2Profile()[@"board"];
-    else if (strcmp(name, "kern.osproductversion") == 0) value = H2Profile()[@"ios"];
-    else if (strcmp(name, "kern.osrelease") == 0) value = H2Profile()[@"darwin"];
-    else if (strcmp(name, "kern.version") == 0) value = [NSString stringWithFormat:@"Darwin Kernel Version %@: H2Changer; root:xnu-%@/RELEASE_ARM64", H2Profile()[@"darwin"], H2Profile()[@"build"]];
+    if (strcmp(name, "hw.machine") == 0) value = profile[@"model"];
+    else if (strcmp(name, "hw.model") == 0) value = profile[@"board"];
+    else if (strcmp(name, "kern.osproductversion") == 0) value = profile[@"ios"];
+    else if (strcmp(name, "kern.osrelease") == 0) value = profile[@"darwin"];
+    else if (strcmp(name, "kern.version") == 0 && profile[@"darwin"] && profile[@"build"]) value = [NSString stringWithFormat:@"Darwin Kernel Version %@: H2Changer; root:xnu-%@/RELEASE_ARM64", profile[@"darwin"], profile[@"build"]];
     if (!value) return %orig;
     const char *text = value.UTF8String;
     size_t required = strlen(text) + 1;
@@ -536,24 +566,28 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
 
 %hookf(int, uname, struct utsname *name) {
     int result = %orig;
-    if (result == 0 && name && H2FakeEnabled()) {
-        NSDictionary *profile = H2Profile();
-        snprintf(name->machine, sizeof(name->machine), "%s", [profile[@"model"] UTF8String]);
-        snprintf(name->release, sizeof(name->release), "%s", [profile[@"darwin"] UTF8String]);
-        snprintf(name->version, sizeof(name->version), "Darwin Kernel Version %s: H2Changer; root:xnu-%s/RELEASE_ARM64", [profile[@"darwin"] UTF8String], [profile[@"build"] UTF8String]);
+    if (result == 0 && name) {
+        NSDictionary *profile = H2EnabledProfile();
+        NSString *model = [profile[@"model"] isKindOfClass:NSString.class] ? profile[@"model"] : nil;
+        NSString *darwin = [profile[@"darwin"] isKindOfClass:NSString.class] ? profile[@"darwin"] : nil;
+        NSString *build = [profile[@"build"] isKindOfClass:NSString.class] ? profile[@"build"] : nil;
+        if (!model || !darwin || !build) return result;
+        snprintf(name->machine, sizeof(name->machine), "%s", model.UTF8String ?: "");
+        snprintf(name->release, sizeof(name->release), "%s", darwin.UTF8String ?: "");
+        snprintf(name->version, sizeof(name->version), "Darwin Kernel Version %s: H2Changer; root:xnu-%s/RELEASE_ARM64", darwin.UTF8String ?: "", build.UTF8String ?: "");
     }
     return result;
 }
 
 %hookf(CFArrayRef, CNCopySupportedInterfaces) {
-    if (!H2FakeEnabled()) return %orig;
+    if (!H2EnabledProfile()) return %orig;
     NSArray *interfaces = @[ @"en0" ];
     return (CFArrayRef)CFBridgingRetain(interfaces);
 }
 
 %hookf(CFDictionaryRef, CNCopyCurrentNetworkInfo, CFStringRef interfaceName) {
-    if (!H2FakeEnabled()) return %orig;
-    NSDictionary *profile = H2Profile();
+    NSDictionary *profile = H2EnabledProfile();
+    if (!profile) return %orig;
     NSString *ssid = [profile[@"ssid"] isKindOfClass:NSString.class] ? profile[@"ssid"] : @"";
     NSString *bssid = [profile[@"bssid"] isKindOfClass:NSString.class] ? profile[@"bssid"] : @"";
     NSDictionary *network = @{
@@ -566,16 +600,18 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
 
 %group H2MobileGestalt
 %hookf(CFTypeRef, MGCopyAnswer, CFStringRef key) {
-    if (!key || !H2FakeEnabled()) return %orig;
+    if (!key) return %orig;
+    NSDictionary *profile = H2EnabledProfile();
+    if (!profile) return %orig;
     NSString *answer = nil;
-    if (CFStringCompare(key, CFSTR("HardwareModel"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"board"];
-    else if (CFStringCompare(key, CFSTR("ProductType"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"model"];
-    else if (CFStringCompare(key, CFSTR("ProductVersion"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"ios"];
-    else if (CFStringCompare(key, CFSTR("InternationalMobileEquipmentIdentity"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"imei"];
-    else if (CFStringCompare(key, CFSTR("InternationalMobileEquipmentIdentity2"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"imei2"];
+    if (CFStringCompare(key, CFSTR("HardwareModel"), 0) == kCFCompareEqualTo) answer = profile[@"board"];
+    else if (CFStringCompare(key, CFSTR("ProductType"), 0) == kCFCompareEqualTo) answer = profile[@"model"];
+    else if (CFStringCompare(key, CFSTR("ProductVersion"), 0) == kCFCompareEqualTo) answer = profile[@"ios"];
+    else if (CFStringCompare(key, CFSTR("InternationalMobileEquipmentIdentity"), 0) == kCFCompareEqualTo) answer = profile[@"imei"];
+    else if (CFStringCompare(key, CFSTR("InternationalMobileEquipmentIdentity2"), 0) == kCFCompareEqualTo) answer = profile[@"imei2"];
     else if (CFStringCompare(key, CFSTR("DeviceClass"), 0) == kCFCompareEqualTo) answer = @"iPhone";
-    else if (CFStringCompare(key, CFSTR("DeviceName"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"name"];
-    else if (CFStringCompare(key, CFSTR("UserAssignedDeviceName"), 0) == kCFCompareEqualTo) answer = H2Profile()[@"name"];
+    else if (CFStringCompare(key, CFSTR("DeviceName"), 0) == kCFCompareEqualTo) answer = profile[@"name"];
+    else if (CFStringCompare(key, CFSTR("UserAssignedDeviceName"), 0) == kCFCompareEqualTo) answer = profile[@"name"];
     else if (CFStringCompare(key, CFSTR("CPUArchitecture"), 0) == kCFCompareEqualTo) answer = @"arm64";
     if (answer) return CFStringCreateCopy(kCFAllocatorDefault, (__bridge CFStringRef)answer);
     return %orig;
