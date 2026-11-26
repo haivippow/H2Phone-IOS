@@ -51,7 +51,7 @@ This file records what the current source can change, what it changes only parti
 | JavaScript CPU/touch values | Supported | Overrides `hardwareConcurrency` and `maxTouchPoints` when Safari exposes configurable descriptors. |
 | Canvas fingerprint | Partial | Covers 2D `getImageData`, `toDataURL`, `toBlob`, and OffscreenCanvas 2D `getImageData`. WebGL readback, image encoding differences and other paths can remain real. |
 | WebGL fingerprint | Partial | Covers debug vendor/renderer parameters for WebGL/WebGL2. Extensions, limits, precision, shaders and rendered output can still expose the real engine/GPU. |
-| AudioContext fingerprint | Partial | Perturbs `AudioBuffer.getChannelData` and `copyFromChannel` samples deterministically. Nodes, timing, hardware output and alternative readback paths remain real. |
+| AudioContext fingerprint | Partial | Perturbs `AudioBuffer.getChannelData` once per returned typed array and reapplies deterministic noise after each `copyFromChannel` copy without cumulative drift. Nodes, timing, hardware output and alternative readback paths remain real. |
 | Font fingerprint | Partial | Stabilizes Canvas text width and `document.fonts.check` results. Installed fonts, glyph rasterization and DOM layout can still expose the real environment. |
 | Media codecs/capabilities | Partial | Stabilizes common `canPlayType`, `MediaSource.isTypeSupported`, and decoding `MediaCapabilities` results. Real decode behavior and encoding paths remain real. |
 | Permissions and media devices | Partial | Permission queries report `prompt` and enumeration returns deterministic unlabeled devices. Actual prompts, capture results, authorization and native AVFoundation remain real. |
@@ -74,3 +74,5 @@ This file records what the current source can change, what it changes only parti
 ## Verification rule
 
 An API-level fake is considered verified only after comparing Fake OFF, Fake ON, profile switching, and Restore Original on the target iPhone. A matching value in DeviceTest proves only that named API path; it does not prove that every third-party app or server sees the same result.
+
+For an already-open document, Fake OFF invokes the injected state's `disable()` routine, restores saved JavaScript descriptors/methods in reverse order, and removes the H2 user script from future navigations. Re-enabling can install the wrappers again in the same document. Native hooks call their original implementation for subsequent queries while disabled; values an app already cached remain the app's responsibility.

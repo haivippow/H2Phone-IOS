@@ -21,6 +21,7 @@
 static char H2OriginalUserAgentKey;
 static __thread BOOL H2SettingWebUserAgent;
 static __thread BOOL H2ReadingConfig;
+static __thread BOOL H2ReadingFilesystemProfile;
 static NSHashTable<WKWebView *> *H2TrackedWebViews;
 static int H2RuntimeNotificationToken = -1;
 
@@ -190,11 +191,16 @@ static void H2RefreshTrackedWebViews(void) {
 %end
 
 static NSDictionary<NSFileAttributeKey, id> *H2FakeFilesystemAttributes(NSDictionary<NSFileAttributeKey, id> *original) {
-    if (!original || !H2FakeEnabled()) return original;
+    if (!original || H2ReadingFilesystemProfile) return original;
+    H2ReadingFilesystemProfile = YES;
+    NSDictionary *profile = H2EnabledProfile();
+    H2ReadingFilesystemProfile = NO;
+    if (!profile) return original;
     NSMutableDictionary *fake = [original mutableCopy];
-    NSDictionary *profile = H2Profile();
-    fake[NSFileSystemSize] = profile[@"diskTotal"];
-    fake[NSFileSystemFreeSize] = profile[@"diskFree"];
+    NSNumber *total = profile[@"diskTotal"];
+    NSNumber *free = profile[@"diskFree"];
+    if (total) fake[NSFileSystemSize] = total;
+    if (free) fake[NSFileSystemFreeSize] = free;
     return fake;
 }
 
@@ -211,24 +217,39 @@ static BOOL H2IsVolumeCapacityKey(NSURLResourceKey key) {
         [key isEqualToString:NSURLVolumeAvailableCapacityForOpportunisticUsageKey];
 }
 
-static NSNumber *H2VolumeCapacityValue(NSURLResourceKey key) {
-    NSDictionary *profile = H2Profile();
+static NSNumber *H2VolumeCapacityValue(NSURLResourceKey key, NSDictionary *profile) {
     return [key isEqualToString:NSURLVolumeTotalCapacityKey] ? profile[@"diskTotal"] : profile[@"diskFree"];
+}
+
+static NSDictionary *H2FilesystemProfile(void) {
+    if (H2ReadingFilesystemProfile) return nil;
+    H2ReadingFilesystemProfile = YES;
+    NSDictionary *profile = H2EnabledProfile();
+    H2ReadingFilesystemProfile = NO;
+    return profile;
 }
 
 %hook NSURL
 - (BOOL)getResourceValue:(out id _Nullable *)value forKey:(NSURLResourceKey)key error:(NSError **)error {
-    if (H2FakeEnabled() && H2IsVolumeCapacityKey(key)) {
-        if (value) *value = H2VolumeCapacityValue(key);
+    NSDictionary *profile = H2IsVolumeCapacityKey(key) ? H2FilesystemProfile() : nil;
+    NSNumber *capacity = profile ? H2VolumeCapacityValue(key, profile) : nil;
+    if (capacity) {
+        if (value) *value = capacity;
         return YES;
     }
     return %orig;
 }
 - (NSDictionary<NSURLResourceKey, id> *)resourceValuesForKeys:(NSArray<NSURLResourceKey> *)keys error:(NSError **)error {
     NSDictionary *original = %orig;
-    if (!H2FakeEnabled() || !original) return original;
+    if (!original) return original;
+    NSDictionary *profile = H2FilesystemProfile();
+    if (!profile) return original;
     NSMutableDictionary *fake = [original mutableCopy];
-    for (NSURLResourceKey key in keys) if (H2IsVolumeCapacityKey(key)) fake[key] = H2VolumeCapacityValue(key);
+    for (NSURLResourceKey key in keys) {
+        if (!H2IsVolumeCapacityKey(key)) continue;
+        NSNumber *capacity = H2VolumeCapacityValue(key, profile);
+        if (capacity) fake[key] = capacity;
+    }
     return fake;
 }
 %end
@@ -500,7 +521,8 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
 
 %hookf(CFArrayRef, CNCopySupportedInterfaces) {
     if (!H2FakeEnabled()) return %orig;
-    return (__bridge_retained CFArrayRef)@[ @"en0" ];
+    NSArray *interfaces = @[ @"en0" ];
+    return (CFArrayRef)CFBridgingRetain(interfaces);
 }
 
 %hookf(CFDictionaryRef, CNCopyCurrentNetworkInfo, CFStringRef interfaceName) {
@@ -511,7 +533,7 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
         (__bridge NSString *)kCNNetworkInfoKeyBSSID: profile[@"bssid"],
         (__bridge NSString *)kCNNetworkInfoKeySSIDData: [profile[@"ssid"] dataUsingEncoding:NSUTF8StringEncoding]
     };
-    return (__bridge_retained CFDictionaryRef)network;
+    return (CFDictionaryRef)CFBridgingRetain(network);
 }
 
 %group H2MobileGestalt
