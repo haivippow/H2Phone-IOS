@@ -17,6 +17,8 @@ The tweak changes values returned inside selected apps for `UIDevice.name`, `mod
 
 Profiles include iPhone 13 Pro Max (iOS 17.7), 14 Pro Max (iOS 17.6), 15 Pro Max (iOS 18.0), and 16 Pro Max (iOS 18.1). Each profile returns its matching model identifier through `sysctlbyname("hw.machine")` and `uname` inside selected apps. DeviceTest shows both values for verification. Fake OFF returns the original API values. These values do not upgrade the actual iOS installation.
 
+The expanded profile also covers common filesystem capacity, uptime/boot-time, thermal/Low Power Mode and CaptiveNetwork SSID/BSSID reads, plus additional browser Canvas, audio, font, codec/media, permissions/device and WebRTC host-candidate surfaces. These are partial API hooks, not changes to real storage, clocks, Wi-Fi, media hardware, public IP or WebKit. See the [capability matrix](docs/capability-matrix.md) for exact limits.
+
 Safari appears in Test Apps and can be selected explicitly. The tweak attaches its `WKUserScript` to Safari's `WKWebViewConfiguration` before the web view is initialized; WebKit then transfers that document-start script to the separate WebContent process. It also applies the profile User-Agent to Safari loads while Fake is ON and restores the prior custom User-Agent after Fake is turned OFF. Both `navigator.userAgent` and the HTTP User-Agent header still require on-device verification.
 
 Apps such as AIDA64 may read other APIs or cache results. Selecting an app does not guarantee that every value it displays changes. DeviceTest now shows separate readings from the added APIs so remaining gaps can be identified on the phone.

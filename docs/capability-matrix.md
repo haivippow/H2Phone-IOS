@@ -29,12 +29,12 @@ This file records what the current source can change, what it changes only parti
 | Carrier and MCC/MNC | Partial | Covers `CTCarrier` name, MCC, MNC and country getters when a carrier object exists. |
 | Cellular radio | Supported at API level | Returns LTE and creates a stable synthetic radio-service dictionary entry when the original dictionary is empty. This does not create a real SIM or cellular connection. |
 | Motion sensors | Partial | Covers selected accelerometer, gyroscope and device-motion vector getters. Other sensors, timestamps and update cadence remain real. |
-| Disk capacity/free space | Not implemented | Filesystem capacity and free-space APIs remain real. |
-| Uptime and boot time | Not implemented | Process/system uptime and boot-time paths remain real. |
-| Thermal and low-power mode | Not implemented | Thermal state, Low Power Mode and related notifications remain real. |
+| Disk capacity/free space | Partial | Covers `NSFileManager` filesystem attributes and common `NSURL` volume-capacity keys. Raw `statfs`/`statvfs`, quotas and actual allocation remain real. |
+| Uptime and boot time | Partial | Covers `NSProcessInfo.systemUptime` and `sysctlbyname("kern.boottime")`. Mach clocks, process start time and timing side channels remain real. |
+| Thermal and low-power mode | Partial | Returns nominal thermal state and Low Power Mode off through `NSProcessInfo`. Notifications, battery discharge and performance remain real. |
 | Keychain and prior installation state | Not implemented | Existing Keychain items, install identifiers and cached values are not reset or namespaced by profile. |
 | App Store receipt and region | Not implemented | Receipt contents, storefront/account region and purchase history remain real. |
-| Wi-Fi SSID/BSSID and interfaces | Not implemented | Requires additional hooks and, for some APIs, entitlements. MAC/radio state is not changed. |
+| Wi-Fi SSID/BSSID and interfaces | Partial | CaptiveNetwork copy APIs return profile SSID/BSSID and `en0`. NetworkExtension, `getifaddrs`, entitlement checks, MAC/radio state and the actual network remain real. |
 | App extensions/helper processes | Not implemented generally | A helper or extension with a different bundle ID is not automatically selected with its parent app. |
 | API-call audit tracing | Not implemented | Debug Logs currently record configuration changes, not every fingerprint API/key/caller used by an app. |
 
@@ -49,20 +49,20 @@ This file records what the current source can change, what it changes only parti
 | JavaScript language/time zone/platform | Supported | Overrides navigator language/languages/platform/vendor and common time-zone APIs at document start. |
 | JavaScript screen/DPR | Supported | Overrides `screen` dimensions and `devicePixelRatio` without changing native UIKit layout. |
 | JavaScript CPU/touch values | Supported | Overrides `hardwareConcurrency` and `maxTouchPoints` when Safari exposes configurable descriptors. |
-| Canvas fingerprint | Partial | Covers `getImageData` and `toDataURL`. `toBlob`, OffscreenCanvas and every rendering/readback path are not covered. |
+| Canvas fingerprint | Partial | Covers 2D `getImageData`, `toDataURL`, `toBlob`, and OffscreenCanvas 2D `getImageData`. WebGL readback, image encoding differences and other paths can remain real. |
 | WebGL fingerprint | Partial | Covers debug vendor/renderer parameters for WebGL/WebGL2. Extensions, limits, precision, shaders and rendered output can still expose the real engine/GPU. |
-| AudioContext fingerprint | Not implemented | Audio graph/rendering fingerprint remains real. |
-| Font fingerprint | Not implemented | Installed fonts, text metrics and font enumeration remain real. |
-| Media codecs/capabilities | Not implemented | Codec support and `MediaCapabilities` results remain real. |
-| Permissions and media devices | Not implemented | Permission state, camera/microphone devices and device labels remain real. |
-| WebRTC | Not implemented | ICE candidates, local/public addresses and WebRTC capabilities remain real. |
+| AudioContext fingerprint | Partial | Perturbs `AudioBuffer.getChannelData` and `copyFromChannel` samples deterministically. Nodes, timing, hardware output and alternative readback paths remain real. |
+| Font fingerprint | Partial | Stabilizes Canvas text width and `document.fonts.check` results. Installed fonts, glyph rasterization and DOM layout can still expose the real environment. |
+| Media codecs/capabilities | Partial | Stabilizes common `canPlayType`, `MediaSource.isTypeSupported`, and decoding `MediaCapabilities` results. Real decode behavior and encoding paths remain real. |
+| Permissions and media devices | Partial | Permission queries report `prompt` and enumeration returns deterministic unlabeled devices. Actual prompts, capture results, authorization and native AVFoundation remain real. |
+| WebRTC | Partial | Redacts host ICE candidate/address getters and JSON output. Server-reflexive/relay candidates, SDP paths, public IP and WebRTC engine capabilities remain real. |
 | WebKit engine behavior | Cannot be fully changed | Feature support, bugs, rendering, JavaScript engine and API availability still correspond to the installed iOS/WebKit version. |
 
 ## Network and server-side identity
 
 | Surface | Status | Requirement/limit |
 | --- | --- | --- |
-| Local IP | Not implemented | Network interface addresses remain real. |
+| Local IP | Not implemented | Network interface addresses remain real. WebRTC host-candidate redaction only covers selected JavaScript getters and is not an interface-address change. |
 | Public IP and geolocation | Outside tweak | Requires VPN/proxy routing; servers see the actual egress IP otherwise. |
 | DNS resolver and DNS leaks | Outside tweak | Requires DNS/VPN configuration and leak protection. |
 | TLS/JA3/JA4 fingerprint | Outside tweak | Requires a compatible proxy/network stack; WebKit/CFNetwork TLS behavior remains real. |

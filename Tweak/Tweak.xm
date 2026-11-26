@@ -14,7 +14,9 @@
 #import <CoreTelephony/CTCarrier.h>
 #import <CoreTelephony/CTTelephonyNetworkInfo.h>
 #import <CoreMotion/CoreMotion.h>
+#import <SystemConfiguration/CaptiveNetwork.h>
 #import <notify.h>
+#import <sys/time.h>
 
 static char H2OriginalUserAgentKey;
 static __thread BOOL H2SettingWebUserAgent;
@@ -187,6 +189,50 @@ static void H2RefreshTrackedWebViews(void) {
 }
 %end
 
+static NSDictionary<NSFileAttributeKey, id> *H2FakeFilesystemAttributes(NSDictionary<NSFileAttributeKey, id> *original) {
+    if (!original || !H2FakeEnabled()) return original;
+    NSMutableDictionary *fake = [original mutableCopy];
+    NSDictionary *profile = H2Profile();
+    fake[NSFileSystemSize] = profile[@"diskTotal"];
+    fake[NSFileSystemFreeSize] = profile[@"diskFree"];
+    return fake;
+}
+
+%hook NSFileManager
+- (NSDictionary<NSFileAttributeKey, id> *)attributesOfFileSystemForPath:(NSString *)path error:(NSError **)error {
+    return H2FakeFilesystemAttributes(%orig);
+}
+%end
+
+static BOOL H2IsVolumeCapacityKey(NSURLResourceKey key) {
+    return [key isEqualToString:NSURLVolumeTotalCapacityKey] ||
+        [key isEqualToString:NSURLVolumeAvailableCapacityKey] ||
+        [key isEqualToString:NSURLVolumeAvailableCapacityForImportantUsageKey] ||
+        [key isEqualToString:NSURLVolumeAvailableCapacityForOpportunisticUsageKey];
+}
+
+static NSNumber *H2VolumeCapacityValue(NSURLResourceKey key) {
+    NSDictionary *profile = H2Profile();
+    return [key isEqualToString:NSURLVolumeTotalCapacityKey] ? profile[@"diskTotal"] : profile[@"diskFree"];
+}
+
+%hook NSURL
+- (BOOL)getResourceValue:(out id _Nullable *)value forKey:(NSURLResourceKey)key error:(NSError **)error {
+    if (H2FakeEnabled() && H2IsVolumeCapacityKey(key)) {
+        if (value) *value = H2VolumeCapacityValue(key);
+        return YES;
+    }
+    return %orig;
+}
+- (NSDictionary<NSURLResourceKey, id> *)resourceValuesForKeys:(NSArray<NSURLResourceKey> *)keys error:(NSError **)error {
+    NSDictionary *original = %orig;
+    if (!H2FakeEnabled() || !original) return original;
+    NSMutableDictionary *fake = [original mutableCopy];
+    for (NSURLResourceKey key in keys) if (H2IsVolumeCapacityKey(key)) fake[key] = H2VolumeCapacityValue(key);
+    return fake;
+}
+%end
+
 %hook NSUserDefaults
 - (NSString *)stringForKey:(NSString *)key {
     if (H2IsUserAgentKey(key) && H2FakeEnabled()) return H2WebUserAgentForProfile(H2Profile());
@@ -346,6 +392,21 @@ static void H2RefreshTrackedWebViews(void) {
 
 %hook NSProcessInfo
 
+- (NSTimeInterval)systemUptime {
+    if (!H2FakeEnabled()) return %orig;
+    return [H2Profile()[@"uptime"] doubleValue];
+}
+
+- (NSProcessInfoThermalState)thermalState {
+    if (!H2FakeEnabled()) return %orig;
+    return NSProcessInfoThermalStateNominal;
+}
+
+- (BOOL)isLowPowerModeEnabled {
+    if (!H2FakeEnabled()) return %orig;
+    return NO;
+}
+
 - (unsigned long long)physicalMemory {
     if (!H2FakeEnabled()) return %orig;
     return [H2Profile()[@"memory"] unsignedLongLongValue];
@@ -404,6 +465,11 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
         int cores = [H2Profile()[@"cores"] intValue];
         return H2CopySysctlScalar(&cores, sizeof(cores), oldp, oldlenp);
     }
+    if (strcmp(name, "kern.boottime") == 0) {
+        NSTimeInterval uptime = [H2Profile()[@"uptime"] doubleValue];
+        struct timeval boot = { (time_t)(NSDate.date.timeIntervalSince1970 - uptime), 0 };
+        return H2CopySysctlScalar(&boot, sizeof(boot), oldp, oldlenp);
+    }
     NSString *value = nil;
     if (strcmp(name, "hw.machine") == 0) value = H2Profile()[@"model"];
     else if (strcmp(name, "hw.model") == 0) value = H2Profile()[@"board"];
@@ -430,6 +496,22 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
         snprintf(name->version, sizeof(name->version), "Darwin Kernel Version %s: H2Changer; root:xnu-%s/RELEASE_ARM64", [profile[@"darwin"] UTF8String], [profile[@"build"] UTF8String]);
     }
     return result;
+}
+
+%hookf(CFArrayRef, CNCopySupportedInterfaces) {
+    if (!H2FakeEnabled()) return %orig;
+    return (__bridge_retained CFArrayRef)@[ @"en0" ];
+}
+
+%hookf(CFDictionaryRef, CNCopyCurrentNetworkInfo, CFStringRef interfaceName) {
+    if (!H2FakeEnabled()) return %orig;
+    NSDictionary *profile = H2Profile();
+    NSDictionary *network = @{
+        (__bridge NSString *)kCNNetworkInfoKeySSID: profile[@"ssid"],
+        (__bridge NSString *)kCNNetworkInfoKeyBSSID: profile[@"bssid"],
+        (__bridge NSString *)kCNNetworkInfoKeySSIDData: [profile[@"ssid"] dataUsingEncoding:NSUTF8StringEncoding]
+    };
+    return (__bridge_retained CFDictionaryRef)network;
 }
 
 %group H2MobileGestalt
