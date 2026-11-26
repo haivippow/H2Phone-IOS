@@ -55,6 +55,26 @@ static NSString *H2WebUserAgentForProfile(NSDictionary<NSString *, id> *profile)
     return [NSString stringWithFormat:@"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/%@ Mobile/15E148 Safari/604.1", cpuVersion, version];
 }
 
+static BOOL H2IsUserAgentKey(NSString *key) {
+    NSString *normalized = key.lowercaseString;
+    return [normalized isEqualToString:@"useragent"] || [normalized isEqualToString:@"user-agent"];
+}
+
+static BOOL H2IsDirectUserAgentScript(NSString *script) {
+    NSString *normalized = [[script stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] stringByReplacingOccurrencesOfString:@";" withString:@""];
+    return [normalized isEqualToString:@"navigator.userAgent"] || [normalized isEqualToString:@"window.navigator.userAgent"];
+}
+
+static NSDictionary *H2FakeSystemVersionDictionary(NSDictionary *original) {
+    if (!original || !H2FakeEnabled()) return original;
+    NSMutableDictionary *fake = [original mutableCopy] ?: [NSMutableDictionary dictionary];
+    NSDictionary *profile = H2Profile();
+    fake[@"ProductName"] = @"iPhone OS";
+    fake[@"ProductVersion"] = profile[@"ios"];
+    fake[@"ProductBuildVersion"] = profile[@"build"];
+    return fake;
+}
+
 static void H2ApplyWebUserAgent(WKWebView *webView) {
     NSDictionary<NSString *, id> *profile = H2EnabledProfile();
     BOOL enabled = profile != nil;
@@ -139,6 +159,75 @@ static void H2RefreshTrackedWebViews(void) {
     return H2FakeEnabled() && original != UIDeviceBatteryStateUnknown ? UIDeviceBatteryStateUnplugged : original;
 }
 
+%end
+
+%hook NSDictionary
++ (instancetype)dictionaryWithContentsOfFile:(NSString *)path {
+    NSDictionary *original = %orig;
+    return [path isEqualToString:@"/System/Library/CoreServices/SystemVersion.plist"] ? H2FakeSystemVersionDictionary(original) : original;
+}
+- (instancetype)initWithContentsOfFile:(NSString *)path {
+    NSDictionary *original = %orig;
+    return [path isEqualToString:@"/System/Library/CoreServices/SystemVersion.plist"] ? H2FakeSystemVersionDictionary(original) : original;
+}
+%end
+
+%hook NSBundle
+- (id)objectForInfoDictionaryKey:(NSString *)key {
+    if ([self.bundlePath isEqualToString:@"/System/Library/CoreServices/SystemVersion.bundle"] && H2FakeEnabled()) {
+        if ([key isEqualToString:@"ProductVersion"]) return H2Profile()[@"ios"];
+        if ([key isEqualToString:@"ProductBuildVersion"]) return H2Profile()[@"build"];
+        if ([key isEqualToString:@"ProductName"]) return @"iPhone OS";
+    }
+    return %orig;
+}
+- (NSDictionary<NSString *, id> *)infoDictionary {
+    NSDictionary *original = %orig;
+    return [self.bundlePath isEqualToString:@"/System/Library/CoreServices/SystemVersion.bundle"] ? H2FakeSystemVersionDictionary(original) : original;
+}
+%end
+
+%hook NSUserDefaults
+- (NSString *)stringForKey:(NSString *)key {
+    if (H2IsUserAgentKey(key) && H2FakeEnabled()) return H2WebUserAgentForProfile(H2Profile());
+    return %orig;
+}
+- (id)objectForKey:(NSString *)key {
+    if (H2IsUserAgentKey(key) && H2FakeEnabled()) return H2WebUserAgentForProfile(H2Profile());
+    return %orig;
+}
+%end
+
+%hook NSMutableURLRequest
+- (void)setValue:(NSString *)value forHTTPHeaderField:(NSString *)field {
+    if (value && [field caseInsensitiveCompare:@"User-Agent"] == NSOrderedSame && H2FakeEnabled()) value = H2WebUserAgentForProfile(H2Profile());
+    %orig(value, field);
+}
+- (void)addValue:(NSString *)value forHTTPHeaderField:(NSString *)field {
+    if ([field caseInsensitiveCompare:@"User-Agent"] == NSOrderedSame && H2FakeEnabled()) return [self setValue:H2WebUserAgentForProfile(H2Profile()) forHTTPHeaderField:field];
+    return %orig;
+}
+- (void)setAllHTTPHeaderFields:(NSDictionary<NSString *, NSString *> *)fields {
+    if (!H2FakeEnabled()) return %orig;
+    NSMutableDictionary *fake = [fields mutableCopy] ?: [NSMutableDictionary dictionary];
+    fake[@"User-Agent"] = H2WebUserAgentForProfile(H2Profile());
+    return %orig(fake);
+}
+%end
+
+%hook UIWebView
+- (NSString *)stringByEvaluatingJavaScriptFromString:(NSString *)script {
+    if (H2IsDirectUserAgentScript(script) && H2FakeEnabled()) return H2WebUserAgentForProfile(H2Profile());
+    return %orig;
+}
+- (void)loadRequest:(NSURLRequest *)request {
+    if (H2FakeEnabled()) {
+        NSMutableURLRequest *fake = [request mutableCopy];
+        [fake setValue:H2WebUserAgentForProfile(H2Profile()) forHTTPHeaderField:@"User-Agent"];
+        return %orig(fake);
+    }
+    return %orig;
+}
 %end
 
 %hook ASIdentifierManager
@@ -318,6 +407,8 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
     if (strcmp(name, "hw.machine") == 0) value = H2Profile()[@"model"];
     else if (strcmp(name, "hw.model") == 0) value = H2Profile()[@"board"];
     else if (strcmp(name, "kern.osproductversion") == 0) value = H2Profile()[@"ios"];
+    else if (strcmp(name, "kern.osrelease") == 0) value = H2Profile()[@"darwin"];
+    else if (strcmp(name, "kern.version") == 0) value = [NSString stringWithFormat:@"Darwin Kernel Version %@: H2Changer; root:xnu-%@/RELEASE_ARM64", H2Profile()[@"darwin"], H2Profile()[@"build"]];
     if (!value) return %orig;
     const char *text = value.UTF8String;
     size_t required = strlen(text) + 1;
@@ -332,7 +423,10 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
 %hookf(int, uname, struct utsname *name) {
     int result = %orig;
     if (result == 0 && name && H2FakeEnabled()) {
-        snprintf(name->machine, sizeof(name->machine), "%s", [H2Profile()[@"model"] UTF8String]);
+        NSDictionary *profile = H2Profile();
+        snprintf(name->machine, sizeof(name->machine), "%s", [profile[@"model"] UTF8String]);
+        snprintf(name->release, sizeof(name->release), "%s", [profile[@"darwin"] UTF8String]);
+        snprintf(name->version, sizeof(name->version), "Darwin Kernel Version %s: H2Changer; root:xnu-%s/RELEASE_ARM64", [profile[@"darwin"] UTF8String], [profile[@"build"] UTF8String]);
     }
     return result;
 }

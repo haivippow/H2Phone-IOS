@@ -5,6 +5,7 @@ The tweak checks Fake ON and the current app bundle ID before returning profile 
 | Surface | Source behavior | Limit |
 | --- | --- | --- |
 | Model / board / iOS | `UIDevice`, `NSProcessInfo`, `sysctlbyname`, `uname`, selected MobileGestalt keys | Other system paths may remain real. |
+| Full-process OS identity | Darwin release/version, `SystemVersion.plist` and `SystemVersion.bundle` reads use the selected profile | Deliberately affects Apple frameworks in the selected process and may cause incompatible code paths or crashes. |
 | IDFV | Profile UUID from `UIDevice.identifierForVendor` | Same UUID is used across selected apps for the same profile. |
 | IDFA | Profile UUID from `ASIdentifierManager.advertisingIdentifier` | All-zero value remains all zeros when tracking access is not granted. |
 | GPS | `CLLocation.coordinate` reports 21.0285, 105.8542 (Hanoi) | Does not move the radio or change server-derived location. Other location properties remain original. |
@@ -15,6 +16,7 @@ The tweak checks Fake ON and the current app bundle ID before returning profile 
 | Memory / CPU | `NSProcessInfo` physical memory and CPU counts plus `hw.memsize`, `hw.ncpu`, `hw.physicalcpu`, and `hw.logicalcpu` | Does not change real resource limits, scheduling, performance, or jetsam behavior. |
 | Display | JavaScript `screen` dimensions and DPR use the selected profile; native `UIScreen` stays original | Keeping native geometry real prevents broken keyboards, safe areas, rotations, and app layouts. |
 | Web User-Agent | `WKWebView.customUserAgent` for selected apps | Safari and other apps require on-device verification; broader fingerprint properties remain original. |
+| Legacy/cached User-Agent | UIWebView JavaScript reads, common `NSUserDefaults` UA keys, mutable request UA headers | Apps can still use custom caches, encrypted storage, server-side values, or helper processes. |
 | IMEI 1 / 2 | Synthetic 15-digit values returned for two MobileGestalt IMEI keys in selected apps | Real modem and carrier IMEI are unchanged. Other IMEI APIs are not covered. |
 | Web fingerprint | A document-start, all-frames `WKUserScript` overrides JavaScript User-Agent, appVersion, language, time zone, screen/DPR, CPU/touch counts, WebGL debug vendor/renderer, and Canvas `getImageData`/`toDataURL` in selected `WKWebView` pages | Safari receives the script through its preconfigured web view; the tweak does not run `WKUserContentController` inside WebContent. Does not change the real WebKit engine or cover fonts, audio, `toBlob`, every canvas/WebGL path, TLS, or server-side fingerprinting. Requires on-device verification. |
 

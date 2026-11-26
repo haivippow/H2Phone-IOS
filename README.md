@@ -31,6 +31,8 @@ The current source safely JSON-encodes profile-controlled User-Agent text before
 
 Selected apps now consume one expanded profile for native model/OS identifiers, RAM/CPU, carrier, location and battery values. Native `UIScreen` geometry stays real so keyboards, safe areas and responsive layouts remain correct. Their `WKWebView` pages consume profile screen/DPR values only inside JavaScript, together with CPU/touch counts, WebGL identity, User-Agent, locale/time zone and Canvas output. These are API-level overrides only; actual hardware, resource limits, WebKit engine, TLS and public IP remain unchanged.
 
+Full-process mode also overrides Darwin/kernel version, SystemVersion plist/bundle reads, legacy UIWebView User-Agent queries, common cached User-Agent keys, and mutable request User-Agent headers for selected processes. This intentionally exposes the fake OS version to Apple frameworks inside that process and can make WebKit/UIKit take incompatible code paths; the user accepted that stability risk. Native screen geometry remains the safety exception.
+
 ## Quick start
 
 Run setup and build commands using [docs/build-install.md](docs/build-install.md). On WSL2 Ubuntu 24.04, run `bash Scripts/build.sh`. A rootless `.deb` has been built in `packages/`; installation and behavior on an iPhone have not yet been tested.

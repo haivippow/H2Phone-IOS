@@ -45,7 +45,7 @@ $plist = Get-Content -Raw (Join-Path $repoRoot 'Tweak/H2ChangerHook.plist')
 Assert-SourceContains $plist 'com\.apple\.mobilesafari' `
     'The tweak filter must explicitly include MobileSafari.'
 
-foreach ($key in @('memory', 'cores', 'screenWidth', 'screenHeight', 'screenScale', 'carrier', 'latitude', 'longitude', 'battery')) {
+foreach ($key in @('memory', 'cores', 'screenWidth', 'screenHeight', 'screenScale', 'carrier', 'latitude', 'longitude', 'battery', 'build', 'darwin')) {
     Assert-SourceContains $config ('@"' + $key + '"') "Profiles must define $key."
 }
 Assert-SourceContains $tweak 'physicalMemory' 'Selected apps must receive profile physical memory.'
@@ -57,6 +57,11 @@ Assert-SourceContains $fingerprint "prop\(Screen\.prototype,'width'" `
 Assert-SourceContains $fingerprint "prop\(window,'devicePixelRatio'" `
     'Browser DPR must remain isolated to JavaScript.'
 Assert-SourceContains $tweak 'notify_register_dispatch' 'Open web views must refresh after runtime configuration changes.'
+Assert-SourceContains $tweak 'kern\.osrelease' 'Selected processes must receive the profile Darwin release.'
+Assert-SourceContains $tweak 'SystemVersion\.plist' 'Selected processes must receive a fake SystemVersion dictionary.'
+Assert-SourceContains $tweak '%hook\s+UIWebView' 'Legacy UIWebView User-Agent reads must be covered.'
+Assert-SourceContains $tweak '%hook\s+NSUserDefaults' 'Cached User-Agent reads must be covered.'
+Assert-SourceContains $tweak '%hook\s+NSMutableURLRequest' 'Outgoing User-Agent headers must be covered.'
 Assert-SourceContains $rootMakefile 'ARCHS = arm64 arm64e' 'Safari support requires an arm64e tweak slice.'
 
-Write-Output 'Source tests passed: 26 assertions.'
+Write-Output 'Source tests passed: 33 assertions.'

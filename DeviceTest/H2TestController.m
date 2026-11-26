@@ -156,6 +156,7 @@ static NSString *H2GestaltValue(CFStringRef key) {
     struct utsname systemInfo = {0};
     NSString *unameMachine = uname(&systemInfo) == 0 ? [NSString stringWithUTF8String:systemInfo.machine] : @"(unavailable)";
     CLLocation *location = self.locationManager.location;
+    NSDictionary *systemVersion = [NSDictionary dictionaryWithContentsOfFile:@"/System/Library/CoreServices/SystemVersion.plist"];
     NSString *gps = location ? [NSString stringWithFormat:@"%.4f, %.4f", location.coordinate.latitude, location.coordinate.longitude] : @"(permission/location unavailable)";
     CTCarrier *carrier = [CTTelephonyNetworkInfo new].subscriberCellularProvider;
     CMAcceleration acceleration = self.motionManager.accelerometerData.acceleration;
@@ -170,6 +171,9 @@ static NSString *H2GestaltValue(CFStringRef key) {
         @[@"Board (sysctl)", H2SysctlValue("hw.model")],
         @[@"iOS (sysctl)", H2SysctlValue("kern.osproductversion")],
         @[@"iOS (NSProcessInfo)", NSProcessInfo.processInfo.operatingSystemVersionString],
+        @[@"Darwin (sysctl)", H2SysctlValue("kern.osrelease")],
+        @[@"SystemVersion.plist", [NSString stringWithFormat:@"%@ (%@)", systemVersion[@"ProductVersion"] ?: @"-", systemVersion[@"ProductBuildVersion"] ?: @"-"]],
+        @[@"Cached UserAgent", [NSUserDefaults.standardUserDefaults stringForKey:@"UserAgent"] ?: @"(nil)"],
         @[@"RAM / CPU", [NSString stringWithFormat:@"%.0f MB / %lu cores", NSProcessInfo.processInfo.physicalMemory / 1048576.0, (unsigned long)NSProcessInfo.processInfo.processorCount]],
         @[@"Native layout (kept real)", [NSString stringWithFormat:@"%.0fx%.0f @%.1fx", UIScreen.mainScreen.bounds.size.width, UIScreen.mainScreen.bounds.size.height, UIScreen.mainScreen.scale]],
         @[@"Native panel (kept real)", [NSString stringWithFormat:@"%.0fx%.0f", UIScreen.mainScreen.nativeBounds.size.width, UIScreen.mainScreen.nativeBounds.size.height]],
