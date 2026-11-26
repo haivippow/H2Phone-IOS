@@ -153,6 +153,7 @@ NSString *H2WebFingerprintScript(NSString *userAgent, NSDictionary<NSString *, i
 }
 
 void H2ConfigureWebContent(WKWebViewConfiguration *configuration, NSString *userAgent, NSDictionary<NSString *, id> *profile, NSUInteger seed, BOOL enabled) {
+    if (!configuration) return;
     WKUserContentController *controller = configuration.userContentController;
     if (!controller) return;
     NSString *desired = enabled ? H2WebFingerprintScript(userAgent, profile, seed) : nil;

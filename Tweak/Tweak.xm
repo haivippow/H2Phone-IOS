@@ -5,6 +5,8 @@
 #import <sys/utsname.h>
 #import <errno.h>
 #import <stdio.h>
+#import <stdlib.h>
+#import <math.h>
 #import <string.h>
 #import <dlfcn.h>
 #import <WebKit/WebKit.h>
@@ -34,17 +36,20 @@ static NSDictionary<NSString *, id> *H2CurrentConfig(void) {
 }
 
 static BOOL H2FakeEnabled(void) {
+    if (H2ReadingConfig) return NO;
     NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
     if (!bundleID.length || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return NO;
     return [H2CurrentConfig()[@"enabled"] boolValue];
 }
 
 static NSDictionary<NSString *, id> *H2Profile(void) {
+    if (H2ReadingConfig) return nil;
     NSString *name = H2CurrentConfig()[@"profile"];
     return [H2ConfigManager profileNamed:name];
 }
 
 static NSDictionary<NSString *, id> *H2EnabledProfile(void) {
+    if (H2ReadingConfig) return nil;
     NSString *bundleID = [NSBundle mainBundle].bundleIdentifier;
     if (!bundleID.length || ([bundleID hasPrefix:@"com.apple."] && ![bundleID isEqualToString:H2SafariBundleID]) || [bundleID isEqualToString:@"com.h2changer.app"]) return nil;
     NSDictionary *config = H2CurrentConfig();
@@ -61,6 +66,17 @@ static NSString *H2WebUserAgentForProfile(NSDictionary<NSString *, id> *profile)
 static BOOL H2IsUserAgentKey(NSString *key) {
     NSString *normalized = key.lowercaseString;
     return [normalized isEqualToString:@"useragent"] || [normalized isEqualToString:@"user-agent"];
+}
+
+static NSNumber *H2UnsignedNumber(id value) {
+    if ([value isKindOfClass:NSNumber.class]) return @([value unsignedLongLongValue]);
+    if (![value isKindOfClass:NSString.class] || [value length] == 0) return nil;
+    const char *text = [value UTF8String];
+    char *end = NULL;
+    errno = 0;
+    unsigned long long parsed = strtoull(text, &end, 10);
+    if (errno != 0 || end == text || (end && *end != '\0')) return nil;
+    return @(parsed);
 }
 
 static BOOL H2IsDirectUserAgentScript(NSString *script) {
@@ -128,7 +144,7 @@ static void H2RefreshTrackedWebViews(void) {
 
 - (NSString *)model {
     if (!H2FakeEnabled()) return %orig;
-    return H2Profile()[@"name"];
+    return @"iPhone";
 }
 
 - (NSString *)localizedModel {
@@ -147,9 +163,12 @@ static void H2RefreshTrackedWebViews(void) {
 }
 
 - (NSUUID *)identifierForVendor {
-    if (!H2FakeEnabled()) return %orig;
+    NSUUID *original = %orig;
+    if (!H2FakeEnabled()) return original;
     NSString *uuid = H2Profile()[@"uuid"];
-    return [[NSUUID alloc] initWithUUIDString:uuid];
+    if (![uuid isKindOfClass:NSString.class] || uuid.length == 0) return original;
+    NSUUID *fake = [[NSUUID alloc] initWithUUIDString:uuid];
+    return fake ?: original;
 }
 
 - (float)batteryLevel {
@@ -197,8 +216,8 @@ static NSDictionary<NSFileAttributeKey, id> *H2FakeFilesystemAttributes(NSDictio
     H2ReadingFilesystemProfile = NO;
     if (!profile) return original;
     NSMutableDictionary *fake = [original mutableCopy];
-    NSNumber *total = profile[@"diskTotal"];
-    NSNumber *free = profile[@"diskFree"];
+    NSNumber *total = H2UnsignedNumber(profile[@"diskTotal"]);
+    NSNumber *free = H2UnsignedNumber(profile[@"diskFree"]);
     if (total) fake[NSFileSystemSize] = total;
     if (free) fake[NSFileSystemFreeSize] = free;
     return fake;
@@ -218,7 +237,8 @@ static BOOL H2IsVolumeCapacityKey(NSURLResourceKey key) {
 }
 
 static NSNumber *H2VolumeCapacityValue(NSURLResourceKey key, NSDictionary *profile) {
-    return [key isEqualToString:NSURLVolumeTotalCapacityKey] ? profile[@"diskTotal"] : profile[@"diskFree"];
+    id value = [key isEqualToString:NSURLVolumeTotalCapacityKey] ? profile[@"diskTotal"] : profile[@"diskFree"];
+    return H2UnsignedNumber(value);
 }
 
 static NSDictionary *H2FilesystemProfile(void) {
@@ -301,7 +321,10 @@ static NSDictionary *H2FilesystemProfile(void) {
 - (NSUUID *)advertisingIdentifier {
     NSUUID *original = %orig;
     if (!H2FakeEnabled() || !original || [original.UUIDString isEqualToString:@"00000000-0000-0000-0000-000000000000"]) return original;
-    return [[NSUUID alloc] initWithUUIDString:H2Profile()[@"idfa"]];
+    NSString *idfa = H2Profile()[@"idfa"];
+    if (![idfa isKindOfClass:NSString.class] || idfa.length == 0) return original;
+    NSUUID *fake = [[NSUUID alloc] initWithUUIDString:idfa];
+    return fake ?: original;
 }
 %end
 
@@ -487,8 +510,11 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
         return H2CopySysctlScalar(&cores, sizeof(cores), oldp, oldlenp);
     }
     if (strcmp(name, "kern.boottime") == 0) {
+        NSTimeInterval now = NSDate.date.timeIntervalSince1970;
         NSTimeInterval uptime = [H2Profile()[@"uptime"] doubleValue];
-        struct timeval boot = { (time_t)(NSDate.date.timeIntervalSince1970 - uptime), 0 };
+        if (!isfinite(uptime) || uptime < 0) uptime = 0;
+        if (uptime > now) uptime = now;
+        struct timeval boot = { (time_t)(now - uptime), 0 };
         return H2CopySysctlScalar(&boot, sizeof(boot), oldp, oldlenp);
     }
     NSString *value = nil;
@@ -528,10 +554,12 @@ static int H2CopySysctlScalar(const void *value, size_t valueSize, void *oldp, s
 %hookf(CFDictionaryRef, CNCopyCurrentNetworkInfo, CFStringRef interfaceName) {
     if (!H2FakeEnabled()) return %orig;
     NSDictionary *profile = H2Profile();
+    NSString *ssid = [profile[@"ssid"] isKindOfClass:NSString.class] ? profile[@"ssid"] : @"";
+    NSString *bssid = [profile[@"bssid"] isKindOfClass:NSString.class] ? profile[@"bssid"] : @"";
     NSDictionary *network = @{
-        (__bridge NSString *)kCNNetworkInfoKeySSID: profile[@"ssid"],
-        (__bridge NSString *)kCNNetworkInfoKeyBSSID: profile[@"bssid"],
-        (__bridge NSString *)kCNNetworkInfoKeySSIDData: [profile[@"ssid"] dataUsingEncoding:NSUTF8StringEncoding]
+        (__bridge NSString *)kCNNetworkInfoKeySSID: ssid,
+        (__bridge NSString *)kCNNetworkInfoKeyBSSID: bssid,
+        (__bridge NSString *)kCNNetworkInfoKeySSIDData: [ssid dataUsingEncoding:NSUTF8StringEncoding] ?: [NSData data]
     };
     return (CFDictionaryRef)CFBridgingRetain(network);
 }
