@@ -52,10 +52,10 @@ Assert-SourceContains $tweak 'physicalMemory' 'Selected apps must receive profil
 if ($tweak -match '%hook\s+UIScreen') {
     throw 'UIScreen must not be hooked because fake native bounds break app and Safari keyboard layout.'
 }
-Assert-SourceContains $fingerprint "prop\(Screen\.prototype,'width'" `
-    'Browser screen width must remain isolated to JavaScript.'
-Assert-SourceContains $fingerprint "prop\(window,'devicePixelRatio'" `
-    'Browser DPR must remain isolated to JavaScript.'
+if ($fingerprint -match "prop\(Screen\.prototype,'(?:width|height|availWidth|availHeight)'" -or
+    $fingerprint -match "prop\(window,'devicePixelRatio'") {
+    throw 'Safari screen geometry must stay native so text-selection touch coordinates remain aligned.'
+}
 Assert-SourceContains $tweak 'notify_register_dispatch' 'Open web views must refresh after runtime configuration changes.'
 Assert-SourceContains $tweak 'kern\.osrelease' 'Selected processes must receive the profile Darwin release.'
 Assert-SourceContains $tweak 'SystemVersion\.plist' 'Selected processes must receive a fake SystemVersion dictionary.'

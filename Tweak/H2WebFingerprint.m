@@ -15,9 +15,6 @@ static NSString *H2JSONValue(id value, NSString *fallback) {
 
 static NSDictionary<NSString *, id> *H2BrowserProfile(NSDictionary<NSString *, id> *profile) {
     return @{
-        @"screenWidth": profile[@"screenWidth"] ?: @0,
-        @"screenHeight": profile[@"screenHeight"] ?: @0,
-        @"screenScale": profile[@"screenScale"] ?: @1,
         @"cores": profile[@"cores"] ?: @1,
         @"maxTouchPoints": profile[@"maxTouchPoints"] ?: @1,
         @"webglVendor": profile[@"webglVendor"] ?: @"Apple Inc.",
@@ -55,13 +52,8 @@ NSString *H2WebFingerprintScript(NSString *userAgent, NSDictionary<NSString *, i
     @"prop(Navigator.prototype,'hardwareConcurrency',function(){return s.profile.cores;});"
     @"prop(Navigator.prototype,'maxTouchPoints',function(){return s.profile.maxTouchPoints;});"
     @"if(typeof Screen!=='undefined'){"
-    @"prop(Screen.prototype,'width',function(){return s.profile.screenWidth;});"
-    @"prop(Screen.prototype,'height',function(){return s.profile.screenHeight;});"
-    @"prop(Screen.prototype,'availWidth',function(){return s.profile.screenWidth;});"
-    @"prop(Screen.prototype,'availHeight',function(){return s.profile.screenHeight;});"
     @"prop(Screen.prototype,'colorDepth',function(){return 24;});"
     @"prop(Screen.prototype,'pixelDepth',function(){return 24;});}"
-    @"prop(window,'devicePixelRatio',function(){return s.profile.screenScale;});"
     @"if(typeof Intl!=='undefined'&&Intl.DateTimeFormat){"
     @"var ro=Intl.DateTimeFormat.prototype.resolvedOptions;"
     @"remember(Intl.DateTimeFormat.prototype,'resolvedOptions');"
