@@ -48,11 +48,25 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 12) {
-                    Text("H2").font(.title2.bold()).foregroundStyle(.white).frame(width: 48, height: 48).background(Palette.blue, in: RoundedRectangle(cornerRadius: 12))
-                    VStack(alignment: .leading) { Text("H2PHONE").font(.largeTitle.bold()); Text("Quản lý cấu hình thiết bị & dữ liệu ứng dụng").font(.caption).foregroundStyle(.secondary) }
-                    Spacer(minLength: 0)
-                }.padding(.top, 12)
+                VStack(spacing: 8) {
+                    Image("Icon-1024")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 76, height: 76)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(Palette.blue.opacity(0.16), lineWidth: 1)
+                        }
+                        .shadow(color: Palette.blue.opacity(0.14), radius: 10, y: 4)
+                    Text("H2PHONE").font(.title.bold())
+                    Text("Quản lý cấu hình thiết bị & dữ liệu ứng dụng")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 8)
                 if let profile = store.active {
                     H2Card {
                         VStack(alignment: .leading, spacing: 14) {

@@ -12,6 +12,7 @@ $phoneMakefile = Get-Content -Raw (Join-Path $repoRoot 'H2PHONE/Makefile')
 $phoneAppDelegate = Get-Content -Raw (Join-Path $repoRoot 'H2PHONE/H2PhoneAppDelegate.m')
 $swiftFactoryPath = Join-Path $repoRoot 'H2PhoneSwiftUI/App/H2PhoneRootViewControllerFactory.swift'
 $swiftFactory = if (Test-Path $swiftFactoryPath) { Get-Content -Raw $swiftFactoryPath } else { '' }
+$dashboardViews = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Features/DashboardAndProfilesViews.swift')
 $devEntitlementsPath = Join-Path $repoRoot 'H2DEV/H2DEV.entitlements'
 $devEntitlements = if (Test-Path $devEntitlementsPath) { Get-Content -Raw $devEntitlementsPath } else { '' }
 $devMakefile = Get-Content -Raw (Join-Path $repoRoot 'H2DEV/Makefile')
@@ -99,6 +100,12 @@ Assert-SourceContains $phoneAppDelegate 'H2PhoneRootViewControllerFactory\s+make
     'The app delegate must install the SwiftUI root view controller.'
 Assert-SourceContains $swiftFactory '(?s)let rootView\s*=\s*RootView\(\).*?UIHostingController\s*\(rootView:\s*rootView\)' `
     'The Swift factory must host RootView in a UIHostingController.'
+Assert-SourceContains $dashboardViews 'struct\s+DashboardView[\s\S]*?ScrollView\s*\{' `
+    'The dashboard must remain vertically scrollable.'
+Assert-SourceContains $dashboardViews 'Image\s*\(\s*"Icon-1024"\s*\)' `
+    'The dashboard header must use the bundled cat app icon.'
+Assert-SourceContains $dashboardViews '(?s)Image\s*\(\s*"Icon-1024"\s*\).*?Text\s*\(\s*"H2PHONE"\s*\).*?frame\s*\(maxWidth:\s*\.infinity\)' `
+    'The cat icon and H2PHONE title must form a centered dashboard header.'
 Assert-SourceContains $devMakefile '(?s)ifeq\s*\(\$\(THEOS_PACKAGE_SCHEME\),roothide\).*?H2DEV_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2DEV/H2DEV\.entitlements.*?endif' `
     'H2DEV must use its privileged entitlements only for the roothide scheme.'
 Assert-SourceContains $releaseWorkflow 'https://github\.com/theos/theos\.git' `
@@ -118,4 +125,4 @@ Assert-SourceContains $releaseWorkflow '(?s)gh release create.*packages/com\.h2p
 Assert-SourceContains $buildDocs '(?s)1\. Update the package version in `control`\..*2\. Commit and push source changes to `develop`\.' `
     'Release instructions must commit the updated package version before tagging.'
 
-Write-Output 'Source tests passed: 56 assertions.'
+Write-Output 'Source tests passed: 59 assertions.'

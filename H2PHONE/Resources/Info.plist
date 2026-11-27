@@ -10,7 +10,7 @@
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFiles</key><array><string>Icon-20</string><string>Icon-29</string><string>Icon-40</string><string>Icon-60</string></array>
 <key>CFBundleIcons</key><dict><key>CFBundlePrimaryIcon</key><dict><key>CFBundleIconFiles</key><array><string>Icon-20</string><string>Icon-29</string><string>Icon-40</string><string>Icon-60</string></array></dict></dict>
-  <key>CFBundleShortVersionString</key><string>0.1.33</string>
+  <key>CFBundleShortVersionString</key><string>0.1.34</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>LSRequiresIPhoneOS</key><true/>
 <key>MinimumOSVersion</key><string>16.0</string>
