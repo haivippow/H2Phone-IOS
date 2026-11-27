@@ -1,0 +1,21 @@
+﻿name: H2PHONE
+options:
+  bundleIdPrefix: com.h2phone
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0'
+    SWIFT_VERSION: '5.9'
+    TARGETED_DEVICE_FAMILY: '1'
+    GENERATE_INFOPLIST_FILE: 'YES'
+targets:
+  H2PHONE:
+    type: application
+    platform: iOS
+    sources:
+      - H2PhoneSwiftUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.h2phone.app.swiftui
+        INFOPLIST_KEY_CFBundleDisplayName: H2PHONE
+        INFOPLIST_KEY_UILaunchScreen_Generation: 'YES'
+        CODE_SIGN_ENTITLEMENTS: ''
