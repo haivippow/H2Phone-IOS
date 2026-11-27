@@ -27,8 +27,9 @@ jobs:
         run: |
           rm -f packages/*.deb
           make clean package FINALPACKAGE=1
+          mv packages/*.deb packages/com.h2phone.ios.deb
 
       - name: Publish downloadable package
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" packages/*.deb --target "${GITHUB_SHA}" --title "H2Changer ${GITHUB_REF_NAME}" --generate-notes
+        run: gh release create "${GITHUB_REF_NAME}" packages/com.h2phone.ios.deb --target "${GITHUB_SHA}" --title "H2Changer ${GITHUB_REF_NAME}" --generate-notes
