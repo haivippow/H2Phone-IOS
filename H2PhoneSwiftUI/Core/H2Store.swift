@@ -3,16 +3,24 @@ import Foundation
 
 @MainActor
 final class H2Store: ObservableObject {
-    @Published var profiles: [DeviceProfile] = PreviewData.profiles
-    @Published var activeID: UUID = PreviewData.profiles[0].id
-    @Published var apps: [TargetApp] = PreviewData.apps
+    @Published var profiles: [DeviceProfile]
+    @Published var activeID: UUID
+    @Published var apps: [TargetApp]
     @Published var operation: OperationState = .idle
     @Published var discoveryMessage = "Dữ liệu minh họa • Chưa kết nối quyền đọc ứng dụng trên thiết bị"
 
     private let service: DeviceService
+    private var hasDiscoveredApps = false
 
-    init(service: DeviceService) {
+    init(
+        service: DeviceService,
+        profiles: [DeviceProfile] = PreviewData.profiles,
+        apps: [TargetApp] = PreviewData.apps
+    ) {
         self.service = service
+        self.profiles = profiles
+        self.activeID = profiles.first?.id ?? UUID()
+        self.apps = apps
     }
 
     var active: DeviceProfile? { profiles.first { $0.id == activeID } }
@@ -24,12 +32,26 @@ final class H2Store: ObservableObject {
     }
 
     func discover() async {
+        discoveryMessage = "Đang quét ứng dụng trên thiết bị…"
         do {
             apps = try await service.discoveredApps()
-            discoveryMessage = "Ứng dụng đã phát hiện"
+            hasDiscoveredApps = true
+            discoveryMessage = apps.isEmpty
+                ? "Không tìm thấy ứng dụng có thể truy cập"
+                : "Đã phát hiện \(apps.count) ứng dụng trên thiết bị"
         } catch {
             discoveryMessage = error.localizedDescription
         }
+    }
+
+    func discoverIfNeeded() async {
+        guard !hasDiscoveredApps else { return }
+        await discover()
+    }
+
+    func deleteProfile(_ profile: DeviceProfile) {
+        guard profile.id != activeID, !profile.isOriginal else { return }
+        profiles.removeAll { $0.id == profile.id }
     }
 
     func change(name: String) async {

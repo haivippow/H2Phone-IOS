@@ -4,18 +4,19 @@ struct RootView: View {
     @EnvironmentObject private var store: H2Store
     @State private var tab = 0
     @State private var showChange = false
+    @State private var showTargetApps = false
     @State private var rollbackTarget: DeviceProfile?
     var body: some View {
         TabView(selection: $tab) {
-            DashboardView(tab: $tab, showChange: $showChange, rollbackTarget: $rollbackTarget)
+            DashboardView(tab: $tab, showChange: $showChange, showTargetApps: $showTargetApps, rollbackTarget: $rollbackTarget)
                 .tabItem { Label("Điều khiển", systemImage: "house.fill") }.tag(0)
             ProfilesView(rollbackTarget: $rollbackTarget)
                 .tabItem { Label("Profile", systemImage: "square.stack.fill") }.tag(1)
-            AppsView().tabItem { Label("App mục tiêu", systemImage: "square.grid.2x2.fill") }.tag(2)
         }
         .tint(Palette.blue)
         .sheet(isPresented: $showChange) { ChangeSheet().environmentObject(store).presentationDetents([.medium, .large]) }
-        .sheet(item: $rollbackTarget) { RollbackSheet(profile: $0).environmentObject(store).presentationDetents([.medium, .large]) }
+        .sheet(isPresented: $showTargetApps) { AppsView().environmentObject(store).presentationDetents([.large]) }
+        .sheet(item: $rollbackTarget) { RollbackSheet(profile: $0).environmentObject(store).presentationDetents([.large]) }
         .alert("Trạng thái", isPresented: Binding(get: { if case .unavailable = store.operation { return true }; if case .error = store.operation { return true }; if case .success = store.operation { return true }; return false }, set: { if !$0 { store.operation = .idle } })) {
             Button("Đóng", role: .cancel) { store.operation = .idle }
         } message: {
@@ -44,6 +45,7 @@ struct DashboardView: View {
     @EnvironmentObject private var store: H2Store
     @Binding var tab: Int
     @Binding var showChange: Bool
+    @Binding var showTargetApps: Bool
     @Binding var rollbackTarget: DeviceProfile?
     var body: some View {
         ScrollView {
@@ -88,7 +90,7 @@ struct DashboardView: View {
                         }
                     }.background(Palette.pale, in: RoundedRectangle(cornerRadius: 18))
                 } else { EmptyState(title: "Chưa có Profile", symbol: "iphone") }
-                Button { tab = 2 } label: {
+                Button { showTargetApps = true } label: {
                     H2Card { HStack(spacing: 12) { Image(systemName: "square.stack.3d.up.fill").foregroundStyle(Palette.blue); VStack(alignment: .leading, spacing: 3) { Text("Đang áp dụng cho \(store.selectedApps.count) ứng dụng").font(.subheadline.bold()); Text(store.selectedApps.map(\.name).joined(separator: ", ")).font(.caption).foregroundStyle(.secondary).lineLimit(1) }; Spacer(); Image(systemName: "chevron.right") } }
                 }.buttonStyle(.plain)
                 Button { showChange = true } label: { Label("Change", systemImage: "arrow.triangle.2.circlepath").font(.title3.bold()).frame(maxWidth: .infinity).padding(17).foregroundStyle(.white).background(Palette.blue, in: RoundedRectangle(cornerRadius: 16)) }
@@ -110,29 +112,71 @@ struct ProfilesView: View {
     @EnvironmentObject private var store: H2Store
     @Binding var rollbackTarget: DeviceProfile?
     @State private var query = ""
+    @State private var profilePendingDeletion: DeviceProfile?
     private var filtered: [DeviceProfile] { store.profiles.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || $0.model.localizedCaseInsensitiveContains(query) }.sorted { $0.createdAt > $1.createdAt } }
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    if filtered.isEmpty { EmptyState(title: "Không tìm thấy Profile", symbol: "magnifyingglass") }
-                    ForEach(filtered) { profile in
-                        H2Card {
-                            HStack(alignment: .top, spacing: 13) {
-                                PhoneGlyph()
-                                VStack(alignment: .leading, spacing: 7) {
-                                    HStack { Text(profile.name).font(.headline); if profile.id == store.activeID { Badge(text: "Đang dùng") }; if profile.isOriginal { Text("Máy gốc").font(.caption.bold()).foregroundStyle(Palette.blue) } }
-                                    Text(profile.createdAt.h2Text).font(.caption).foregroundStyle(.secondary)
-                                    Text("\(profile.model) • iOS \(profile.ios) • \(profile.carrier)").font(.caption)
-                                    Label("Backup: \(profile.backupCount) app • \(profile.backupBytes?.h2Size ?? "Chưa xác định")", systemImage: "externaldrive.fill").font(.caption).foregroundStyle(Palette.blue)
-                                    if profile.id != store.activeID { Button("Quay lại bản này") { rollbackTarget = profile }.font(.subheadline.bold()).padding(.top, 3) }
-                                }
-                                Spacer(minLength: 0)
+            List {
+                if filtered.isEmpty {
+                    EmptyState(title: "Không tìm thấy Profile", symbol: "magnifyingglass")
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
+                ForEach(filtered) { profile in
+                    H2Card {
+                        HStack(alignment: .top, spacing: 13) {
+                            PhoneGlyph()
+                            VStack(alignment: .leading, spacing: 7) {
+                                HStack { Text(profile.name).font(.headline); if profile.id == store.activeID { Badge(text: "Đang dùng") }; if profile.isOriginal { Text("Máy gốc").font(.caption.bold()).foregroundStyle(Palette.blue) } }
+                                Text(profile.createdAt.h2Text).font(.caption).foregroundStyle(.secondary)
+                                Text("\(profile.model) • iOS \(profile.ios) • \(profile.carrier)").font(.caption)
+                                Label("Backup: \(profile.backupCount) app • \(profile.backupBytes?.h2Size ?? "Chưa xác định")", systemImage: "externaldrive.fill").font(.caption).foregroundStyle(Palette.blue)
                             }
-                        }.overlay(RoundedRectangle(cornerRadius: 18).stroke(profile.id == store.activeID ? Palette.blue : .clear, lineWidth: 1.5))
+                            Spacer(minLength: 0)
+                        }
                     }
-                }.padding(16)
-            }.background(Palette.background).navigationTitle("Lịch sử Profile").searchable(text: $query, prompt: "Tên profile hoặc dòng máy")
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(profile.id == store.activeID ? Palette.blue : .clear, lineWidth: 1.5))
+                    .contentShape(RoundedRectangle(cornerRadius: 18))
+                    .onTapGesture {
+                        if profile.id != store.activeID {
+                            rollbackTarget = profile
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if profile.id != store.activeID && !profile.isOriginal {
+                            Button(role: .destructive) {
+                                profilePendingDeletion = profile
+                            } label: {
+                                Label("Xóa", systemImage: "trash")
+                            }
+                        }
+                    }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Palette.background)
+            .navigationTitle("Lịch sử Profile")
+            .searchable(text: $query, prompt: "Tên profile hoặc dòng máy")
+            .alert(
+                "Xóa Profile?",
+                isPresented: Binding(
+                    get: { profilePendingDeletion != nil },
+                    set: { if !$0 { profilePendingDeletion = nil } }
+                ),
+                presenting: profilePendingDeletion
+            ) { profile in
+                Button("Hủy", role: .cancel) { profilePendingDeletion = nil }
+                Button("Xóa", role: .destructive) {
+                    store.deleteProfile(profile)
+                    profilePendingDeletion = nil
+                }
+            } message: { profile in
+                Text("Profile \(profile.name) sẽ bị xóa khỏi lịch sử.")
+            }
         }
     }
 }

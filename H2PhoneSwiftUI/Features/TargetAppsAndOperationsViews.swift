@@ -1,9 +1,12 @@
 ﻿import SwiftUI
 
+import UIKit
+
 enum AppFilter: String, CaseIterable { case all = "Tất cả", selected = "Đã chọn", fake = "Fake Info", backup = "Backup Data" }
 
 struct AppsView: View {
     @EnvironmentObject private var store: H2Store
+    @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var filter: AppFilter = .all
     @State private var detail: TargetApp?
@@ -26,9 +29,13 @@ struct AppsView: View {
                     if filtered.isEmpty { EmptyState(title: "Không có ứng dụng phù hợp", symbol: "square.grid.2x2") }
                     ForEach(filtered) { app in AppRow(app: app, detail: $detail) }
                 }.padding(16)
-            }.background(Palette.background).navigationTitle("App mục tiêu").searchable(text: $query, prompt: "Tìm ứng dụng đã cài")
-                .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { Task { await store.discover() } } label: { Image(systemName: "arrow.clockwise") }.accessibilityLabel("Quét ứng dụng") } }
+            }.background(Palette.background).navigationTitle("Ứng dụng áp dụng").searchable(text: $query, prompt: "Tìm ứng dụng đã cài")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) { Button("Đóng") { dismiss() } }
+                    ToolbarItem(placement: .navigationBarTrailing) { Button { Task { await store.discover() } } label: { Image(systemName: "arrow.clockwise") }.accessibilityLabel("Quét ứng dụng") }
+                }
                 .sheet(item: $detail) { AppDetailView(bundleID: $0.id).environmentObject(store).presentationDetents([.medium]) }
+                .task { await store.discoverIfNeeded() }
         }
     }
     private func count(_ item: AppFilter) -> Int { switch item { case .all: return store.apps.count; case .selected: return store.apps.filter(\.isSelected).count; case .fake: return store.apps.filter(\.fakeInfo).count; case .backup: return store.apps.filter(\.backupData).count } }
@@ -40,24 +47,77 @@ struct AppRow: View {
     @Binding var detail: TargetApp?
     var body: some View {
         H2Card {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: app.symbol).font(.title2.bold()).foregroundStyle(.white).frame(width: 48, height: 48).background(Palette.blue, in: RoundedRectangle(cornerRadius: 12))
-                VStack(alignment: .leading, spacing: 3) {
-                    Button { detail = app } label: { HStack { Text(app.name).font(.headline); Image(systemName: "chevron.right").font(.caption) } }.buttonStyle(.plain)
-                    Text(app.id).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                    Text("Dữ liệu: \(app.dataBytes?.h2Size ?? "Chưa xác định")").font(.caption)
-                    if app.resetOnChange && !app.backupData { Text("Reset không backup: có thể mất dữ liệu").font(.caption2).foregroundStyle(.red) }
+            Button { detail = app } label: {
+                HStack(spacing: 12) {
+                    AppIconView(app: app)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(app.name).font(.headline).foregroundStyle(Palette.ink)
+                        Text(app.id).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
+                        Label("Dữ liệu: \(app.dataBytes?.h2Size ?? "Chưa xác định")", systemImage: "internaldrive")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.tertiary)
                 }
-                Spacer(minLength: 0)
+                .contentShape(Rectangle())
+            }.buttonStyle(.plain)
+            Divider().padding(.vertical, 6)
+            VStack(spacing: 12) {
+                AppSettingToggle(symbol: "iphone.gen3.radiowaves.left.and.right", title: "Fake Info", subtitle: "Áp dụng thông tin Profile cho app", isOn: binding(\.fakeInfo))
+                Divider()
+                AppSettingToggle(symbol: "externaldrive", title: "Backup Data", subtitle: "Sao lưu dữ liệu trước khi Change", isOn: binding(\.backupData))
             }
-            Divider().padding(.vertical, 4)
-            HStack(spacing: 14) {
-                Toggle("Fake Info", isOn: binding(\.fakeInfo)).font(.caption)
-                Toggle("Backup Data", isOn: binding(\.backupData)).font(.caption)
-            }.tint(Palette.blue)
+            if app.resetOnChange && !app.backupData {
+                Label("Reset không có backup — dữ liệu có thể bị mất", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.top, 10)
+            }
         }
     }
-    private func binding(_ keyPath: WritableKeyPath<TargetApp, Bool>) -> Binding<Bool> { Binding(get: { store.apps.first(where: { $0.id == app.id })?[keyPath: keyPath] ?? false }, set: { value in var copy = app; copy[keyPath: keyPath] = value; store.update(copy) }) }
+    private func binding(_ keyPath: WritableKeyPath<TargetApp, Bool>) -> Binding<Bool> { Binding(get: { store.apps.first(where: { $0.id == app.id })?[keyPath: keyPath] ?? false }, set: { value in guard var copy = store.apps.first(where: { $0.id == app.id }) else { return }; copy[keyPath: keyPath] = value; store.update(copy) }) }
+}
+
+struct AppIconView: View {
+    let app: TargetApp
+
+    var body: some View {
+        Group {
+            if let data = app.iconPNGData, let image = UIImage(data: data) {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                Image(systemName: app.symbol)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(13)
+                    .foregroundStyle(.white)
+                    .background(Palette.blue)
+            }
+        }
+        .frame(width: 54, height: 54)
+        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(Color.black.opacity(0.06)) }
+    }
+}
+
+struct AppSettingToggle: View {
+    let symbol: String
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol).foregroundStyle(Palette.blue).frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.subheadline.bold())
+                Text(subtitle).font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Toggle("", isOn: $isOn).labelsHidden().tint(Palette.blue)
+        }
+    }
 }
 
 struct AppDetailView: View {
@@ -123,13 +183,68 @@ struct RollbackSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Khôi phục \(profile.name)").font(.title3.bold())
                     Text("\(profile.model) • iOS \(profile.ios) • \(profile.createdAt.h2Text)")
-                    H2Card { VStack(alignment: .leading, spacing: 8) { Text("Dữ liệu sẽ khôi phục").font(.headline); Text("\(profile.backupCount) ứng dụng • \(profile.backupBytes?.h2Size ?? "Chưa xác định")"); Text("Danh sách app trong snapshot chưa khả dụng; cần đọc manifest backup thực tế.").font(.caption).foregroundStyle(.secondary) } }
+                    H2Card {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Dữ liệu sẽ khôi phục").font(.headline)
+                            Text("\(profile.backupCount) ứng dụng • \(profile.backupBytes?.h2Size ?? "Chưa xác định")")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Divider()
+                            if profile.backedUpApps.isEmpty {
+                                Label("Không có danh sách ứng dụng trong bản backup", systemImage: "tray")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(profile.backedUpApps) { app in
+                                    BackupAppRow(app: app)
+                                    if app.id != profile.backedUpApps.last?.id { Divider() }
+                                }
+                            }
+                        }
+                    }
                     Toggle("Backup trạng thái hiện tại trước khi quay lại", isOn: $backupCurrent).tint(Palette.blue)
                     Label("Dữ liệu chưa có bản backup có thể bị mất khi khôi phục.", systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(.orange)
                     Label("Chưa khả dụng trên bản UI: chỉ báo hoàn tất khi service khôi phục trả về thành công.", systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
-                    HStack { Button("Hủy") { dismiss() }.frame(maxWidth: .infinity); Button("Quay lại bản này") { dismiss(); Task { await store.restore(profile, backupCurrent: backupCurrent) } }.buttonStyle(.borderedProminent).tint(Palette.blue).frame(maxWidth: .infinity) }
                 }.padding(20)
             }.background(Palette.background).navigationTitle("Xác nhận quay lại").navigationBarTitleDisplayMode(.inline)
+                .safeAreaInset(edge: .bottom) {
+                    HStack(spacing: 12) {
+                        Button("Hủy") { dismiss() }
+                            .buttonStyle(.bordered)
+                            .frame(maxWidth: .infinity)
+                        Button("Quay lại bản này") {
+                            dismiss()
+                            Task { await store.restore(profile, backupCurrent: backupCurrent) }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Palette.blue)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial)
+                }
+        }
+    }
+}
+
+struct BackupAppRow: View {
+    let app: ProfileAppBackup
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "shippingbox.fill")
+                .foregroundStyle(Palette.blue)
+                .frame(width: 38, height: 38)
+                .background(Palette.pale, in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(app.name).font(.subheadline.bold())
+                Text(app.bundleID).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(app.dataBytes?.h2Size ?? "Không rõ")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

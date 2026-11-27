@@ -1,5 +1,13 @@
 import Foundation
 
+struct ProfileAppBackup: Identifiable, Hashable {
+    let bundleID: String
+    let name: String
+    let dataBytes: Int64?
+
+    var id: String { bundleID }
+}
+
 struct DeviceProfile: Identifiable, Hashable {
     let id: UUID
     let number: Int
@@ -9,17 +17,22 @@ struct DeviceProfile: Identifiable, Hashable {
     let carrier: String
     let region: String
     let uptime: String?
-    let backupCount: Int
-    let backupBytes: Int64?
+    let backedUpApps: [ProfileAppBackup]
     let isOriginal: Bool
 
     var name: String { String(format: "Profile #%02d", number) }
+    var backupCount: Int { backedUpApps.count }
+    var backupBytes: Int64? {
+        guard backedUpApps.allSatisfy({ $0.dataBytes != nil }) else { return nil }
+        return backedUpApps.compactMap(\.dataBytes).reduce(0, +)
+    }
 }
 
 struct TargetApp: Identifiable, Hashable {
     let id: String
     let name: String
     let symbol: String
+    let iconPNGData: Data?
     let dataBytes: Int64?
     var fakeInfo: Bool
     var backupData: Bool
