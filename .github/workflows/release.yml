@@ -32,4 +32,6 @@ jobs:
       - name: Publish downloadable package
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" packages/com.h2phone.ios.deb --target "${GITHUB_SHA}" --title "H2Changer ${GITHUB_REF_NAME}" --generate-notes
+        run: |
+          gh release delete "${GITHUB_REF_NAME}" --yes || true
+          gh release create "${GITHUB_REF_NAME}" packages/com.h2phone.ios.deb --target "${GITHUB_SHA}" --title "H2Changer ${GITHUB_REF_NAME}" --generate-notes
