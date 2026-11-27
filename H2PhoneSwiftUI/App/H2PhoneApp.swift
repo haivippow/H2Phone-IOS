@@ -1,5 +1,6 @@
 ﻿import SwiftUI
 
+#if !THEOS
 @main
 struct H2PhoneApp: App {
     @StateObject private var store = H2Store(service: UnavailableDeviceService())
@@ -7,3 +8,4 @@ struct H2PhoneApp: App {
         WindowGroup { RootView().environmentObject(store) }
     }
 }
+#endif

@@ -9,6 +9,9 @@ $phoneEntitlements = Get-Content -Raw (Join-Path $repoRoot 'H2PHONE/H2PHONE.enti
 $phoneRootHideEntitlementsPath = Join-Path $repoRoot 'H2PHONE/H2PHONE.roothide.entitlements'
 $phoneRootHideEntitlements = if (Test-Path $phoneRootHideEntitlementsPath) { Get-Content -Raw $phoneRootHideEntitlementsPath } else { '' }
 $phoneMakefile = Get-Content -Raw (Join-Path $repoRoot 'H2PHONE/Makefile')
+$phoneAppDelegate = Get-Content -Raw (Join-Path $repoRoot 'H2PHONE/H2PhoneAppDelegate.m')
+$swiftFactoryPath = Join-Path $repoRoot 'H2PhoneSwiftUI/App/H2PhoneRootViewControllerFactory.swift'
+$swiftFactory = if (Test-Path $swiftFactoryPath) { Get-Content -Raw $swiftFactoryPath } else { '' }
 $devEntitlementsPath = Join-Path $repoRoot 'H2DEV/H2DEV.entitlements'
 $devEntitlements = if (Test-Path $devEntitlementsPath) { Get-Content -Raw $devEntitlementsPath } else { '' }
 $devMakefile = Get-Content -Raw (Join-Path $repoRoot 'H2DEV/Makefile')
@@ -88,6 +91,14 @@ if ($phoneEntitlements -match 'no-sandbox|storage\.AppBundles|storage\.AppDataCo
 }
 Assert-SourceContains $phoneMakefile '(?s)ifeq\s*\(\$\(THEOS_PACKAGE_SCHEME\),roothide\).*?H2PHONE_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2PHONE/H2PHONE\.roothide\.entitlements.*?else.*?H2PHONE_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2PHONE/H2PHONE\.entitlements.*?endif' `
     'H2PHONE must select RootHide entitlements only for the roothide scheme.'
+Assert-SourceContains $phoneMakefile '(?s)H2PHONE_SWIFT_FILES\s*=.*?H2PhoneSwiftUI' `
+    'The Theos application must compile the H2PhoneSwiftUI sources.'
+Assert-SourceContains $phoneAppDelegate '#import\s+<H2PHONE-Swift\.h>' `
+    'The Objective-C app delegate must import the generated H2PHONE Swift header.'
+Assert-SourceContains $phoneAppDelegate 'H2PhoneRootViewControllerFactory\s+makeRootViewController' `
+    'The app delegate must install the SwiftUI root view controller.'
+Assert-SourceContains $swiftFactory '(?s)let rootView\s*=\s*RootView\(\).*?UIHostingController\s*\(rootView:\s*rootView\)' `
+    'The Swift factory must host RootView in a UIHostingController.'
 Assert-SourceContains $devMakefile '(?s)ifeq\s*\(\$\(THEOS_PACKAGE_SCHEME\),roothide\).*?H2DEV_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2DEV/H2DEV\.entitlements.*?endif' `
     'H2DEV must use its privileged entitlements only for the roothide scheme.'
 Assert-SourceContains $releaseWorkflow 'https://github\.com/theos/theos\.git' `
@@ -107,4 +118,4 @@ Assert-SourceContains $releaseWorkflow '(?s)gh release create.*packages/com\.h2p
 Assert-SourceContains $buildDocs '(?s)1\. Update the package version in `control`\..*2\. Commit and push source changes to `develop`\.' `
     'Release instructions must commit the updated package version before tagging.'
 
-Write-Output 'Source tests passed: 52 assertions.'
+Write-Output 'Source tests passed: 56 assertions.'

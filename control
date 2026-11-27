@@ -1,6 +1,6 @@
 Package: com.h2phone.ios
 Name: H2PHONE
-Version: 0.1.32
+Version: 0.1.33
 Architecture: iphoneos-arm64
 Description: Local device API test controller and isolated test tweak
 Maintainer: H2PHONE
