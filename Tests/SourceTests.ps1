@@ -5,6 +5,15 @@ $fingerprint = Get-Content -Raw (Join-Path $repoRoot 'Tweak/H2WebFingerprint.m')
 $tweak = Get-Content -Raw (Join-Path $repoRoot 'Tweak/Tweak.xm')
 $config = Get-Content -Raw (Join-Path $repoRoot 'H2PHONE/H2ConfigManager.m')
 $rootMakefile = Get-Content -Raw (Join-Path $repoRoot 'Makefile')
+$phoneEntitlements = Get-Content -Raw (Join-Path $repoRoot 'H2PHONE/H2PHONE.entitlements')
+$phoneRootHideEntitlementsPath = Join-Path $repoRoot 'H2PHONE/H2PHONE.roothide.entitlements'
+$phoneRootHideEntitlements = if (Test-Path $phoneRootHideEntitlementsPath) { Get-Content -Raw $phoneRootHideEntitlementsPath } else { '' }
+$phoneMakefile = Get-Content -Raw (Join-Path $repoRoot 'H2PHONE/Makefile')
+$devEntitlementsPath = Join-Path $repoRoot 'H2DEV/H2DEV.entitlements'
+$devEntitlements = if (Test-Path $devEntitlementsPath) { Get-Content -Raw $devEntitlementsPath } else { '' }
+$devMakefile = Get-Content -Raw (Join-Path $repoRoot 'H2DEV/Makefile')
+$releaseWorkflow = Get-Content -Raw (Join-Path $repoRoot '.github/workflows/release.yml')
+$buildDocs = Get-Content -Raw (Join-Path $repoRoot 'docs/build-install.md')
 
 function Assert-SourceContains {
     param([string]$Source, [string]$Pattern, [string]$Message)
@@ -64,4 +73,38 @@ Assert-SourceContains $tweak '%hook\s+NSUserDefaults' 'Cached User-Agent reads m
 Assert-SourceContains $tweak '%hook\s+NSMutableURLRequest' 'Outgoing User-Agent headers must be covered.'
 Assert-SourceContains $rootMakefile 'ARCHS = arm64 arm64e' 'Safari support requires an arm64e tweak slice.'
 
-Write-Output 'Source tests passed: 33 assertions.'
+foreach ($entitlements in @($phoneRootHideEntitlements, $devEntitlements)) {
+    Assert-SourceContains $entitlements '<key>platform-application</key>\s*<true\s*/>' `
+        'RootHide apps require the platform-application entitlement.'
+    Assert-SourceContains $entitlements '<key>com\.apple\.private\.security\.no-sandbox</key>\s*<true\s*/>' `
+        'RootHide apps require the no-sandbox entitlement.'
+    Assert-SourceContains $entitlements '<key>com\.apple\.private\.security\.storage\.AppBundles</key>\s*<true\s*/>' `
+        'RootHide apps require AppBundles storage access.'
+    Assert-SourceContains $entitlements '<key>com\.apple\.private\.security\.storage\.AppDataContainers</key>\s*<true\s*/>' `
+        'RootHide apps require AppDataContainers storage access.'
+}
+if ($phoneEntitlements -match 'no-sandbox|storage\.AppBundles|storage\.AppDataContainers') {
+    throw 'The standard rootless H2PHONE entitlement file must not gain RootHide-only privileges.'
+}
+Assert-SourceContains $phoneMakefile '(?s)ifeq\s*\(\$\(THEOS_PACKAGE_SCHEME\),roothide\).*?H2PHONE_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2PHONE/H2PHONE\.roothide\.entitlements.*?else.*?H2PHONE_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2PHONE/H2PHONE\.entitlements.*?endif' `
+    'H2PHONE must select RootHide entitlements only for the roothide scheme.'
+Assert-SourceContains $devMakefile '(?s)ifeq\s*\(\$\(THEOS_PACKAGE_SCHEME\),roothide\).*?H2DEV_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2DEV/H2DEV\.entitlements.*?endif' `
+    'H2DEV must use its privileged entitlements only for the roothide scheme.'
+Assert-SourceContains $releaseWorkflow 'https://github\.com/theos/theos\.git' `
+    'The release workflow must retain the official Theos checkout for rootless builds.'
+Assert-SourceContains $releaseWorkflow 'https://github\.com/(?:RootHide|roothide)/theos\.git' `
+    'The release workflow must use RootHide Theos for RootHide builds.'
+Assert-SourceContains $releaseWorkflow 'THEOS_PACKAGE_SCHEME=rootless' `
+    'The rootless build must select the rootless package scheme explicitly.'
+Assert-SourceContains $releaseWorkflow 'THEOS_PACKAGE_SCHEME=roothide' `
+    'The RootHide build must select the roothide package scheme explicitly.'
+Assert-SourceContains $releaseWorkflow 'com\.h2phone\.ios-rootless\.deb' `
+    'The rootless release asset must have a stable, distinct filename.'
+Assert-SourceContains $releaseWorkflow 'com\.h2phone\.ios-roothide\.deb' `
+    'The RootHide release asset must have a stable, distinct filename.'
+Assert-SourceContains $releaseWorkflow '(?s)gh release create.*packages/com\.h2phone\.ios-rootless\.deb.*packages/com\.h2phone\.ios-roothide\.deb' `
+    'The release command must publish both jailbreak-specific packages.'
+Assert-SourceContains $buildDocs '(?s)1\. Update the package version in `control`\..*2\. Commit and push source changes to `develop`\.' `
+    'Release instructions must commit the updated package version before tagging.'
+
+Write-Output 'Source tests passed: 52 assertions.'

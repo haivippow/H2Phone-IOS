@@ -13,7 +13,7 @@ Native iPhone controller and isolated API test tweak for iPhone XS on iOS 16.1 w
 
 See [docs/capability-matrix.md](docs/capability-matrix.md) for the complete implemented/partial/not-implemented coverage matrix and known limits.
 
-The tweak changes values returned inside selected apps for `UIDevice.name`, `model`, `systemVersion`, and `identifierForVendor`. It also covers `NSProcessInfo` OS version, `sysctlbyname` model/board/iOS version, `uname` machine, and selected MobileGestalt answers (`HardwareModel`, `ProductType`, `ProductVersion`). Fake OFF and unselected apps call the original methods. H2DEV is selected by default. It never writes hardware identifiers or system settings. The package installs both apps and the tweak as a rootless `.deb` via Sileo.
+The tweak changes values returned inside selected apps for `UIDevice.name`, `model`, `systemVersion`, and `identifierForVendor`. It also covers `NSProcessInfo` OS version, `sysctlbyname` model/board/iOS version, `uname` machine, and selected MobileGestalt answers (`HardwareModel`, `ProductType`, `ProductVersion`). Fake OFF and unselected apps call the original methods. H2DEV is selected by default. It never writes hardware identifiers or system settings. Tagged releases provide separate Sileo packages for standard Dopamine rootless and RootHide.
 
 Profiles include iPhone 13 Pro Max (iOS 17.7), 14 Pro Max (iOS 17.6), 15 Pro Max (iOS 18.0), and 16 Pro Max (iOS 18.1). Each profile returns its matching model identifier through `sysctlbyname("hw.machine")` and `uname` inside selected apps. H2DEV shows both values for verification. Fake OFF returns the original API values. These values do not upgrade the actual iOS installation.
 
@@ -39,4 +39,9 @@ Full-process mode also overrides Darwin/kernel version, SystemVersion plist/bund
 
 ## Quick start
 
-Build tagged releases with the macOS GitHub Actions workflow described in [docs/build-install.md](docs/build-install.md). Download the generated rootless `.deb` from GitHub Releases; no Ubuntu/WSL build environment is required.
+Build tagged releases with the macOS GitHub Actions workflow described in [docs/build-install.md](docs/build-install.md). Pushing `develop` alone does not run the release workflow; pushing a new `v*` tag does. Each GitHub Release contains:
+
+- `com.h2phone.ios-rootless.deb` for standard Dopamine rootless.
+- `com.h2phone.ios-roothide.deb` for RootHide.
+
+Do not install the rootless package on RootHide. No Ubuntu/WSL build environment is required.

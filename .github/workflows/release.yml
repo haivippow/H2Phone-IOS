@@ -1,4 +1,4 @@
-name: Build rootless release
+name: Build rootless and RootHide release
 
 on:
   push:
@@ -18,18 +18,29 @@ jobs:
       - name: Install packaging tools
         run: brew install ldid xz
 
-      - name: Install Theos
-        run: git clone --recursive https://github.com/theos/theos.git "$GITHUB_WORKSPACE/theos"
-
-      - name: Build arm64 and arm64e package
-        env:
-          THEOS: ${{ github.workspace }}/theos
+      - name: Install Theos toolchains
         run: |
+          git clone --recursive https://github.com/theos/theos.git "$GITHUB_WORKSPACE/theos-rootless"
+          git clone --recursive https://github.com/RootHide/theos.git "$GITHUB_WORKSPACE/theos-roothide"
+
+      - name: Build rootless and RootHide packages
+        run: |
+          release_dir="$RUNNER_TEMP/h2phone-release"
+          rm -rf "$release_dir"
+          mkdir -p "$release_dir"
+
           rm -f packages/*.deb
-          make clean package FINALPACKAGE=1
-          mv packages/*.deb packages/com.h2phone.ios.deb
+          THEOS="$GITHUB_WORKSPACE/theos-rootless" make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          mv packages/*.deb "$release_dir/com.h2phone.ios-rootless.deb"
+
+          rm -f packages/*.deb
+          THEOS="$GITHUB_WORKSPACE/theos-roothide" make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide
+          mv packages/*.deb "$release_dir/com.h2phone.ios-roothide.deb"
+
+          rm -f packages/*.deb
+          cp "$release_dir"/*.deb packages/
 
       - name: Publish downloadable package
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" packages/com.h2phone.ios.deb --target "${GITHUB_SHA}" --title "H2Changer ${GITHUB_REF_NAME}" --generate-notes
+        run: gh release create "${GITHUB_REF_NAME}" packages/com.h2phone.ios-rootless.deb packages/com.h2phone.ios-roothide.deb --target "${GITHUB_SHA}" --title "H2PHONE ${GITHUB_REF_NAME}" --generate-notes
