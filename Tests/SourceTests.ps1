@@ -129,10 +129,20 @@ if ($dashboardViews -match 'arrow\.uturn\.backward\.circle\.fill') {
 }
 Assert-SourceContains $profileSettingsModel 'struct\s+ProfileGenerationSettings:\s*Codable,\s*Equatable' `
     'Profile generation settings must be persistable and value-comparable.'
-Assert-SourceContains $profileSettingsModel '(?s)iPhone XS.*?iPhone 16 Pro Max.*?16\.0.*?18\.1' `
-    'Profile settings must expose the approved iPhone and iOS bounds.'
+Assert-SourceContains $profileSettingsModel '(?s)iPhone 7.*?iPhone 18 Pro Max.*?10\.0.*?18\.7.*?26\.5' `
+    'Profile settings must expose the expanded iPhone and iOS catalog.'
 Assert-SourceContains $profileSettingsModel '(?s)mutating\s+func\s+normalizeRanges.*?modelMinimumIndex.*?modelMaximumIndex.*?iosMinimumIndex.*?iosMaximumIndex' `
     'Profile settings must normalize inverted model and iOS ranges.'
+Assert-SourceContains $profileSettingsModel '(?s)legacyModelOptions.*?legacyIOSOptions.*?migrateCatalogIfNeeded' `
+    'Expanded catalogs must migrate indexes saved by the previous release.'
+Assert-SourceContains $profileSettingsModel '(?s)struct\s+DeviceCompatibility.*?minimumIOS.*?maximumIOS.*?compatibleIOSOptions' `
+    'The model catalog must expose compatible iOS bounds instead of allowing impossible pairs.'
+Assert-SourceContains $profileSettingsModel '(?s)enum\s+ProfileRandomField.*?deviceName.*?deviceModel.*?iosVersion.*?idfv.*?idfa.*?imei.*?imei2.*?batteryLevel.*?timeZone.*?wifi.*?location.*?webGL' `
+    'Profile settings must enumerate the full native and web fake capability catalog.'
+Assert-SourceContains $profileSettingsModel '(?s)enum\s+ProfileCapabilityGroup.*?device.*?operatingSystem.*?identifiers.*?batteryAndSystem.*?network.*?location.*?locale.*?sensors.*?webFingerprint' `
+    'Every fake capability must be organized into a visible settings group.'
+Assert-SourceContains $profileSettingsView '(?s)ForEach\(ProfileCapabilityGroup\.allCases.*?DisclosureGroup.*?ProfileRandomField\.allCases.*?Cố định hiện tại' `
+    'The settings UI must show every capability and identify hooks that are currently fixed.'
 Assert-SourceContains $profileSettingsService '(?s)protocol\s+ProfileSettingsService.*?load\(\).*?save\(_\s+settings:\s*ProfileGenerationSettings\).*?UserDefaults' `
     'Profile settings must use an injectable UserDefaults persistence service.'
 Assert-SourceContains $swiftStore '(?s)@Published\s+var\s+generationSettings:\s*ProfileGenerationSettings.*?func\s+updateGenerationSettings.*?settingsService\.save' `
@@ -141,7 +151,7 @@ Assert-SourceContains $phoneMakefile '(?s)ProfileSettingsView\.swift.*?ProfileGe
     'The Theos application must compile every Profile settings source file.'
 Assert-SourceContains $dashboardViews '(?s)@State\s+private\s+var\s+showProfileSettings.*?navigationDestination\(isPresented:\s*\$showProfileSettings\).*?ProfileSettingsView\(\).*?Image\(systemName:\s*"gearshape\.fill"\)' `
     'Dashboard gear navigation must open Profile settings.'
-Assert-SourceContains $profileSettingsView '(?s)ScrollView.*?Model iPhone.*?Phiên bản iOS.*?Nhà mạng.*?Vùng.*?Ngôn ngữ & múi giờ' `
+Assert-SourceContains ($profileSettingsView + $profileSettingsModel) '(?s)ScrollView.*?Model, ProductType & Board.*?Phiên bản iOS.*?Nhà mạng, MCC, MNC & quốc gia.*?Tọa độ latitude & longitude.*?Múi giờ' `
     'Profile settings must provide all five approved random-field toggles in a scrollable screen.'
 Assert-SourceContains $profileSettingsView '(?s)Picker\("Từ iPhone".*?Picker\("Đến iPhone".*?Picker\("Từ iOS".*?Picker\("Đến iOS"' `
     'Profile settings must provide minimum and maximum pickers for iPhone and iOS.'
@@ -245,4 +255,4 @@ Assert-SourceContains $releaseWorkflow '(?s)gh release create.*packages/com\.h2p
 Assert-SourceContains $buildDocs '(?s)1\. Update the package version in `control`\..*2\. Commit and push source changes to `develop`\.' `
     'Release instructions must commit the updated package version before tagging.'
 
-Write-Output 'Source tests passed: 110 assertions.'
+Write-Output 'Source tests passed: 115 assertions.'

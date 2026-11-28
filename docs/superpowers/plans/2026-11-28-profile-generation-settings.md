@@ -14,8 +14,11 @@
 
 - No Save button; every change persists automatically.
 - Normalize inverted min/max ranges.
+- Migrate indexes saved by the original iPhone XS–16 Pro Max catalog before applying the expanded catalog.
+- Restrict generated iOS values to the compatibility bounds of the selected iPhone model.
 - Do not report backend success.
 - Preserve the two-tab layout and Dashboard scrolling.
+- Surface the complete hook capability catalog, including identifiers, system state, connectivity, sensors, and web fingerprint behavior.
 
 ## Review Focus
 

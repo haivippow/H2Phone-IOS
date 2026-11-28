@@ -6,18 +6,19 @@ struct ProfileSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                H2Card {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Thông tin sẽ random").font(.headline).padding(.bottom, 6)
-                        settingToggle("iphone", "Model iPhone", binding: valueBinding(\.randomizeModel))
-                        Divider()
-                        settingToggle("square.stack.3d.up", "Phiên bản iOS", binding: valueBinding(\.randomizeIOS))
-                        Divider()
-                        settingToggle("antenna.radiowaves.left.and.right", "Nhà mạng", binding: valueBinding(\.randomizeCarrier))
-                        Divider()
-                        settingToggle("globe.asia.australia", "Vùng", binding: valueBinding(\.randomizeRegion))
-                        Divider()
-                        settingToggle("character.bubble", "Ngôn ngữ & múi giờ", binding: valueBinding(\.randomizeLocaleAndTimeZone))
+                Text("Thông tin sẽ random").font(.title3.bold())
+                ForEach(ProfileCapabilityGroup.allCases) { group in
+                    H2Card {
+                        DisclosureGroup {
+                            VStack(spacing: 0) {
+                                ForEach(ProfileRandomField.allCases.filter { $0.group == group }) { field in
+                                    capabilityRow(field)
+                                    if field.id != ProfileRandomField.allCases.filter({ $0.group == group }).last?.id { Divider() }
+                                }
+                            }.padding(.top, 8)
+                        } label: {
+                            Text(group.rawValue).font(.headline)
+                        }
                     }
                 }
                 H2Card {
@@ -54,8 +55,19 @@ struct ProfileSettingsView: View {
 
     private var modelOptions: some View { ForEach(Array(ProfileGenerationSettings.modelOptions.enumerated()), id: \.offset) { Text($0.element).tag($0.offset) } }
     private var iosOptions: some View { ForEach(Array(ProfileGenerationSettings.iosOptions.enumerated()), id: \.offset) { Text($0.element).tag($0.offset) } }
-    private func settingToggle(_ symbol: String, _ title: String, binding: Binding<Bool>) -> some View { Toggle(isOn: binding) { Label(title, systemImage: symbol).font(.subheadline) }.tint(Palette.blue).padding(.vertical, 7) }
-    private func valueBinding(_ keyPath: WritableKeyPath<ProfileGenerationSettings, Bool>) -> Binding<Bool> { Binding(get: { store.generationSettings[keyPath: keyPath] }, set: { value in var copy = store.generationSettings; copy[keyPath: keyPath] = value; store.updateGenerationSettings(copy) }) }
+    @ViewBuilder private func capabilityRow(_ field: ProfileRandomField) -> some View {
+        if field.isConfigurable {
+            Toggle(field.title, isOn: fieldBinding(field)).font(.subheadline).tint(Palette.blue).padding(.vertical, 9)
+        } else {
+            HStack(spacing: 8) {
+                Text(field.title).font(.subheadline)
+                Spacer(minLength: 8)
+                Text("Cố định hiện tại").font(.caption2.bold()).foregroundStyle(.secondary)
+                    .padding(.horizontal, 8).padding(.vertical, 4).background(Color.secondary.opacity(0.1), in: Capsule())
+            }.padding(.vertical, 9)
+        }
+    }
+    private func fieldBinding(_ field: ProfileRandomField) -> Binding<Bool> { Binding(get: { store.generationSettings.isEnabled(field) }, set: { value in var copy = store.generationSettings; copy.setEnabled(value, for: field); store.updateGenerationSettings(copy) }) }
     private var modelMinimumBinding: Binding<Int> { Binding(get: { store.generationSettings.modelMinimumIndex }, set: { var copy = store.generationSettings; copy.setModelMinimum($0); store.updateGenerationSettings(copy) }) }
     private var modelMaximumBinding: Binding<Int> { Binding(get: { store.generationSettings.modelMaximumIndex }, set: { var copy = store.generationSettings; copy.setModelMaximum($0); store.updateGenerationSettings(copy) }) }
     private var iosMinimumBinding: Binding<Int> { Binding(get: { store.generationSettings.iosMinimumIndex }, set: { var copy = store.generationSettings; copy.setIOSMinimum($0); store.updateGenerationSettings(copy) }) }

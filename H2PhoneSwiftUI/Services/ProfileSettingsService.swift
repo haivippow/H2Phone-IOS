@@ -16,6 +16,7 @@ struct UserDefaultsProfileSettingsService: ProfileSettingsService {
               var settings = try? JSONDecoder().decode(ProfileGenerationSettings.self, from: data) else {
             return ProfileGenerationSettings()
         }
+        settings.migrateCatalogIfNeeded()
         settings.normalizeRanges()
         return settings
     }
