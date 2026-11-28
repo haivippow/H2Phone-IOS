@@ -143,6 +143,16 @@ Assert-SourceContains $swiftStore '(?s)func\s+deleteProfile.*?profile\.id\s*!=\s
     'Profile deletion must protect the active and original profiles.'
 Assert-SourceContains $swiftModels 'struct\s+ProfileAppBackup:\s*Identifiable,\s*Hashable' `
     'Profile snapshots must model each backed-up application.'
+Assert-SourceContains $swiftModels 'var\s+isSelected:\s*Bool\s*\{\s*fakeInfo\s*\|\|\s*backupData\s*\}' `
+    'Target-app selection must depend only on Fake Info or Backup and Clean.'
+if ($swiftModels -match 'resetOnChange') { throw 'The separate resetOnChange model option must be removed.' }
+Assert-SourceContains $targetAppViews 'title:\s*"Backup\s*&' `
+    'The app UI must present the combined Backup and Clean choice.'
+Assert-SourceContains $targetAppViews 'subtitle:\s*"Ch.*backup.*x.*c minh.*th.*nh c.*ng' `
+    'The app UI must explain the verified-backup safety rule.'
+if ($targetAppViews -match 'Reset Data on Change|resetOnChange|Reset không có backup') {
+    throw 'The app UI must not expose a separate or unsafe reset option.'
+}
 Assert-SourceContains $swiftModels 'let\s+backedUpApps:\s*\[ProfileAppBackup\]' `
     'Each profile must retain its backup application manifest.'
 Assert-SourceContains $targetAppViews 'ForEach\s*\(profile\.backedUpApps\)' `
@@ -173,6 +183,10 @@ Assert-SourceContains $targetAppViews '(?s)struct\s+AppRow.*?H2Card\s*\{\s*VStac
     'Each target app header and its settings must remain inside one card container.'
 Assert-SourceContains $targetAppViews '(?s)LazyVGrid\(columns:\s*filterColumns.*?ForEach\(AppFilter\.allCases' `
     'Target-app filters must use a small-screen-friendly grid.'
+Assert-SourceContains $swiftDeviceService '(?s)withCheckedContinuation.*?DispatchQueue\.global\(qos:\s*\.userInitiated\)\.async.*?installedApplications\(\)' `
+    'Installed-app discovery and icon processing must run away from the main animation thread.'
+Assert-SourceContains $targetAppViews '(?s)ScrollView\s*\{\s*LazyVStack\(alignment:\s*\.leading' `
+    'The target-app sheet must lazily construct application cards.'
 Assert-SourceContains $devMakefile '(?s)ifeq\s*\(\$\(THEOS_PACKAGE_SCHEME\),roothide\).*?H2DEV_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2DEV/H2DEV\.entitlements.*?endif' `
     'H2DEV must use its privileged entitlements only for the roothide scheme.'
 Assert-SourceContains $releaseWorkflow 'https://github\.com/theos/theos\.git' `
@@ -192,4 +206,4 @@ Assert-SourceContains $releaseWorkflow '(?s)gh release create.*packages/com\.h2p
 Assert-SourceContains $buildDocs '(?s)1\. Update the package version in `control`\..*2\. Commit and push source changes to `develop`\.' `
     'Release instructions must commit the updated package version before tagging.'
 
-Write-Output 'Source tests passed: 87 assertions.'
+Write-Output 'Source tests passed: 94 assertions.'

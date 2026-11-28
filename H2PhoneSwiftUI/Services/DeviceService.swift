@@ -23,19 +23,23 @@ struct UnavailableDeviceService: DeviceService {
 struct InstalledAppDeviceService: DeviceService {
     func discoveredApps() async throws -> [TargetApp] {
 #if THEOS
-        return H2InstalledAppService.installedApplications().compactMap { record in
-            guard let bundleID = record["id"] as? String,
-                  let name = record["name"] as? String else { return nil }
-            return TargetApp(
-                id: bundleID,
-                name: name,
-                symbol: "app.fill",
-                iconPNGData: record["iconPNGData"] as? Data,
-                dataBytes: nil,
-                fakeInfo: (record["fakeInfo"] as? NSNumber)?.boolValue ?? false,
-                backupData: false,
-                resetOnChange: false
-            )
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let apps = H2InstalledAppService.installedApplications().compactMap { record -> TargetApp? in
+                    guard let bundleID = record["id"] as? String,
+                          let name = record["name"] as? String else { return nil }
+                    return TargetApp(
+                        id: bundleID,
+                        name: name,
+                        symbol: "app.fill",
+                        iconPNGData: record["iconPNGData"] as? Data,
+                        dataBytes: nil,
+                        fakeInfo: (record["fakeInfo"] as? NSNumber)?.boolValue ?? false,
+                        backupData: false
+                    )
+                }
+                continuation.resume(returning: apps)
+            }
         }
 #else
         throw DeviceServiceError.unavailable

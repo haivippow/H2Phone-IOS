@@ -8,10 +8,10 @@ enum PreviewData {
     ]
 
     static let apps: [TargetApp] = [
-        .init(id: "com.zhiliaoapp.musically", name: "TikTok", symbol: "music.note", iconPNGData: nil, dataBytes: 350_000_000, fakeInfo: true, backupData: true, resetOnChange: true),
-        .init(id: "com.twitter.twitter", name: "X", symbol: "xmark", iconPNGData: nil, dataBytes: 280_000_000, fakeInfo: true, backupData: true, resetOnChange: true),
-        .init(id: "com.facebook.Facebook", name: "Facebook", symbol: "f", iconPNGData: nil, dataBytes: 420_000_000, fakeInfo: false, backupData: false, resetOnChange: false),
-        .init(id: "com.burbn.instagram", name: "Instagram", symbol: "camera", iconPNGData: nil, dataBytes: 310_000_000, fakeInfo: false, backupData: false, resetOnChange: false),
-        .init(id: "com.finalwire.aida64", name: "AIDA64", symbol: "cpu", iconPNGData: nil, dataBytes: 12_000_000, fakeInfo: false, backupData: false, resetOnChange: false)
+        .init(id: "com.zhiliaoapp.musically", name: "TikTok", symbol: "music.note", iconPNGData: nil, dataBytes: 350_000_000, fakeInfo: true, backupData: true),
+        .init(id: "com.twitter.twitter", name: "X", symbol: "xmark", iconPNGData: nil, dataBytes: 280_000_000, fakeInfo: true, backupData: true),
+        .init(id: "com.facebook.Facebook", name: "Facebook", symbol: "f", iconPNGData: nil, dataBytes: 420_000_000, fakeInfo: false, backupData: false),
+        .init(id: "com.burbn.instagram", name: "Instagram", symbol: "camera", iconPNGData: nil, dataBytes: 310_000_000, fakeInfo: false, backupData: false),
+        .init(id: "com.finalwire.aida64", name: "AIDA64", symbol: "cpu", iconPNGData: nil, dataBytes: 12_000_000, fakeInfo: false, backupData: false)
     ]
 }

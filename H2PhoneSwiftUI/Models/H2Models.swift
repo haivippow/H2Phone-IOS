@@ -36,9 +36,8 @@ struct TargetApp: Identifiable, Hashable {
     let dataBytes: Int64?
     var fakeInfo: Bool
     var backupData: Bool
-    var resetOnChange: Bool
 
-    var isSelected: Bool { fakeInfo || backupData || resetOnChange }
+    var isSelected: Bool { fakeInfo || backupData }
 }
 
 enum OperationState: Equatable {
