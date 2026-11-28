@@ -48,27 +48,9 @@ struct DashboardView: View {
     @Binding var showTargetApps: Bool
     @Binding var rollbackTarget: DeviceProfile?
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(spacing: 8) {
-                    Image("Icon-1024")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 76, height: 76)
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .stroke(Palette.blue.opacity(0.16), lineWidth: 1)
-                        }
-                        .shadow(color: Palette.blue.opacity(0.14), radius: 10, y: 4)
-                    Text("H2PHONE").font(.title.bold())
-                    Text("Quản lý cấu hình thiết bị & dữ liệu ứng dụng")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
                 if let profile = store.active {
                     H2Card {
                         VStack(alignment: .leading, spacing: 14) {
@@ -102,8 +84,27 @@ struct DashboardView: View {
                         H2Card { HStack(spacing: 12) { PhoneGlyph(); VStack(alignment: .leading, spacing: 4) { Text(profile.name).font(.headline); Text(profile.createdAt.h2Text).font(.caption).foregroundStyle(.secondary); Text("\(profile.model) • iOS \(profile.ios)").font(.caption) }; Spacer(minLength: 4); Button { rollbackTarget = profile } label: { Image(systemName: "arrow.uturn.backward.circle.fill").font(.title2) }.accessibilityLabel("Quay lại \(profile.name)") } }
                     }
                 }
-            }.padding(20)
-        }.background(Palette.background).foregroundStyle(Palette.ink)
+                }.padding(20)
+            }
+            .background(Palette.background)
+            .foregroundStyle(Palette.ink)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 7) {
+                        Image("Icon-1024")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 28, height: 28)
+                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        Text("H2PHONE")
+                            .font(.headline.bold())
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("H2PHONE")
+                }
+            }
+        }
     }
     private func metric(_ symbol: String, _ value: String, _ caption: String) -> some View { HStack(spacing: 8) { Image(systemName: symbol).foregroundStyle(Palette.blue); VStack(alignment: .leading) { Text(value).font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.75); Text(caption).font(.caption2).foregroundStyle(.secondary) }; Spacer(minLength: 0) }.padding(9).background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 11)) }
 }

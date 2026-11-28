@@ -112,7 +112,7 @@ Assert-SourceContains $dashboardViews 'struct\s+DashboardView[\s\S]*?ScrollView\
     'The dashboard must remain vertically scrollable.'
 Assert-SourceContains $dashboardViews 'Image\s*\(\s*"Icon-1024"\s*\)' `
     'The dashboard header must use the bundled cat app icon.'
-Assert-SourceContains $dashboardViews '(?s)Image\s*\(\s*"Icon-1024"\s*\).*?Text\s*\(\s*"H2PHONE"\s*\).*?frame\s*\(maxWidth:\s*\.infinity\)' `
+Assert-SourceContains $dashboardViews '(?s)ToolbarItem\s*\(placement:\s*\.principal\).*?HStack.*?Image\s*\(\s*"Icon-1024"\s*\).*?Text\s*\(\s*"H2PHONE"\s*\)' `
     'The cat icon and H2PHONE title must form a centered dashboard header.'
 Assert-SourceContains $dashboardViews '(?s)struct\s+ProfilesView.*?onTapGesture\s*\{\s*if\s+profile\.id\s*!=\s*store\.activeID\s*\{\s*rollbackTarget\s*=\s*profile' `
     'Inactive profile cards must open rollback confirmation when tapped.'
@@ -158,8 +158,15 @@ Assert-SourceContains $dashboardViews '(?s)@State\s+private\s+var\s+showTargetAp
     'RootView must present target-app management as a large sheet.'
 Assert-SourceContains $dashboardViews 'Button\s*\{\s*showTargetApps\s*=\s*true\s*\}' `
     'The dashboard app scope card must open the target-app sheet.'
-Assert-SourceContains $targetAppViews 'Button\s*\(\s*"Đóng"\s*\)\s*\{\s*dismiss\(\)' `
+Assert-SourceContains $targetAppViews '(?s)navigationBarLeading.*?dismiss\(\)' `
     'The target-app sheet must provide an explicit close button.'
+Assert-SourceContains $dashboardViews '(?s)struct\s+DashboardView.*?NavigationStack\s*\{.*?ToolbarItem\s*\(placement:\s*\.principal\)' `
+    'The dashboard must use a compact centered navigation header.'
+Assert-SourceContains $dashboardViews '(?s)ToolbarItem\s*\(placement:\s*\.principal\).*?Image\("Icon-1024"\).*?frame\(width:\s*28,\s*height:\s*28\).*?Text\("H2PHONE"\)' `
+    'The dashboard header must show the small cat icon beside H2PHONE.'
+if ($dashboardViews -match 'frame\(width:\s*76,\s*height:\s*76\)') {
+    throw 'The dashboard scroll content must not repeat the large app logo.'
+}
 Assert-SourceContains $devMakefile '(?s)ifeq\s*\(\$\(THEOS_PACKAGE_SCHEME\),roothide\).*?H2DEV_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2DEV/H2DEV\.entitlements.*?endif' `
     'H2DEV must use its privileged entitlements only for the roothide scheme.'
 Assert-SourceContains $releaseWorkflow 'https://github\.com/theos/theos\.git' `
@@ -179,4 +186,4 @@ Assert-SourceContains $releaseWorkflow '(?s)gh release create.*packages/com\.h2p
 Assert-SourceContains $buildDocs '(?s)1\. Update the package version in `control`\..*2\. Commit and push source changes to `develop`\.' `
     'Release instructions must commit the updated package version before tagging.'
 
-Write-Output 'Source tests passed: 81 assertions.'
+Write-Output 'Source tests passed: 84 assertions.'
