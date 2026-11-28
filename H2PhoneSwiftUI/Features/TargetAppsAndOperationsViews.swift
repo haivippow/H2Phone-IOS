@@ -10,6 +10,7 @@ struct AppsView: View {
     @State private var query = ""
     @State private var filter: AppFilter = .all
     @State private var detail: TargetApp?
+    private let filterColumns = [GridItem(.flexible()), GridItem(.flexible())]
     private var filtered: [TargetApp] {
         store.apps.filter { app in
             let matches = query.isEmpty || app.name.localizedCaseInsensitiveContains(query) || app.id.localizedCaseInsensitiveContains(query)
@@ -23,13 +24,22 @@ struct AppsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     Label(store.discoveryMessage, systemImage: "info.circle").font(.caption).foregroundStyle(Palette.blue).frame(maxWidth: .infinity, alignment: .leading).padding(14).background(Palette.pale, in: RoundedRectangle(cornerRadius: 14))
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 7) { ForEach(AppFilter.allCases, id: \.self) { item in Button { filter = item } label: { Text("\(item.rawValue) (\(count(item)))").font(.caption.bold()).padding(.horizontal, 14).padding(.vertical, 9).foregroundStyle(filter == item ? .white : Palette.ink).background(filter == item ? Palette.blue : .white, in: Capsule()) }.buttonStyle(.plain) } }
+                    LazyVGrid(columns: filterColumns, spacing: 8) {
+                        ForEach(AppFilter.allCases, id: \.self) { item in
+                            Button { filter = item } label: {
+                                Text("\(item.rawValue) (\(count(item)))")
+                                    .font(.caption.bold())
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 10)
+                                    .foregroundStyle(filter == item ? .white : Palette.ink)
+                                    .background(filter == item ? Palette.blue : .white, in: RoundedRectangle(cornerRadius: 12))
+                            }.buttonStyle(.plain)
+                        }
                     }
                     if filtered.isEmpty { EmptyState(title: "Không có ứng dụng phù hợp", symbol: "square.grid.2x2") }
                     ForEach(filtered) { app in AppRow(app: app, detail: $detail) }
                 }.padding(16)
-            }.background(Palette.background).navigationTitle("Ứng dụng áp dụng").searchable(text: $query, prompt: "Tìm ứng dụng đã cài")
+            }.background(Palette.background).navigationTitle("Ứng dụng áp dụng").navigationBarTitleDisplayMode(.inline).searchable(text: $query, prompt: "Tìm ứng dụng đã cài")
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) { Button("Đóng") { dismiss() } }
                     ToolbarItem(placement: .navigationBarTrailing) { Button { Task { await store.discover() } } label: { Image(systemName: "arrow.clockwise") }.accessibilityLabel("Quét ứng dụng") }
@@ -47,7 +57,8 @@ struct AppRow: View {
     @Binding var detail: TargetApp?
     var body: some View {
         H2Card {
-            Button { detail = app } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                Button { detail = app } label: {
                 HStack(spacing: 12) {
                     AppIconView(app: app)
                     VStack(alignment: .leading, spacing: 4) {
@@ -61,18 +72,19 @@ struct AppRow: View {
                     Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.tertiary)
                 }
                 .contentShape(Rectangle())
-            }.buttonStyle(.plain)
-            Divider().padding(.vertical, 6)
-            VStack(spacing: 12) {
-                AppSettingToggle(symbol: "iphone.gen3.radiowaves.left.and.right", title: "Fake Info", subtitle: "Áp dụng thông tin Profile cho app", isOn: binding(\.fakeInfo))
-                Divider()
-                AppSettingToggle(symbol: "externaldrive", title: "Backup Data", subtitle: "Sao lưu dữ liệu trước khi Change", isOn: binding(\.backupData))
-            }
-            if app.resetOnChange && !app.backupData {
-                Label("Reset không có backup — dữ liệu có thể bị mất", systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .padding(.top, 10)
+                }.buttonStyle(.plain)
+                Divider().padding(.vertical, 12)
+                VStack(spacing: 12) {
+                    AppSettingToggle(symbol: "iphone.gen3.radiowaves.left.and.right", title: "Fake Info", subtitle: "Áp dụng thông tin Profile cho app", isOn: binding(\.fakeInfo))
+                    Divider()
+                    AppSettingToggle(symbol: "externaldrive", title: "Backup Data", subtitle: "Sao lưu dữ liệu trước khi Change", isOn: binding(\.backupData))
+                }
+                if app.resetOnChange && !app.backupData {
+                    Label("Reset không có backup — dữ liệu có thể bị mất", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .padding(.top, 10)
+                }
             }
         }
     }

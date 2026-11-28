@@ -1,5 +1,7 @@
 ﻿import SwiftUI
 
+import UIKit
+
 struct RootView: View {
     @EnvironmentObject private var store: H2Store
     @State private var tab = 0
@@ -39,6 +41,25 @@ struct Badge: View {
 
 struct PhoneGlyph: View {
     var body: some View { ZStack { RoundedRectangle(cornerRadius: 10).fill(LinearGradient(colors: [Color(red: 0.16, green: 0.42, blue: 0.86), Color(red: 0.72, green: 0.83, blue: 1)], startPoint: .topLeading, endPoint: .bottomTrailing)); RoundedRectangle(cornerRadius: 10).stroke(Palette.ink, lineWidth: 2); Image(systemName: "apple.logo").foregroundStyle(.white) }.frame(width: 42, height: 76) }
+}
+
+struct H2BrandIcon: View {
+    private var bundledImage: UIImage? {
+        guard let path = Bundle.main.path(forResource: "Icon-1024", ofType: "png") else { return nil }
+        return UIImage(contentsOfFile: path)
+    }
+
+    var body: some View {
+        Group {
+            if let bundledImage {
+                Image(uiImage: bundledImage).resizable().scaledToFill()
+            } else {
+                Image(systemName: "cat.fill")
+                    .resizable().scaledToFit().padding(5)
+                    .foregroundStyle(.white).background(Palette.blue)
+            }
+        }
+    }
 }
 
 struct DashboardView: View {
@@ -92,9 +113,7 @@ struct DashboardView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     HStack(spacing: 7) {
-                        Image("Icon-1024")
-                            .resizable()
-                            .scaledToFill()
+                        H2BrandIcon()
                             .frame(width: 28, height: 28)
                             .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                         Text("H2PHONE")
