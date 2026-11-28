@@ -13,8 +13,10 @@ The workflow runs only when a version tag matching `v*` is pushed. A normal `git
 5. Download the package matching the active jailbreak:
    - `com.h2phone.ios-rootless.deb` for standard Dopamine rootless.
    - `com.h2phone.ios-roothide.deb` for RootHide.
-
-The workflow isolates the two build outputs before copying both stable filenames into `packages/`, so one scheme cannot overwrite the other.
+6. Ex
+   - git commit and git push
+   - git tag v0.1.35 and git origin push v0.1.35 (git action)
+     The workflow isolates the two build outputs before copying both stable filenames into `packages/`, so one scheme cannot overwrite the other.
 
 ## Install on the iPhone
 
