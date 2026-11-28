@@ -68,6 +68,7 @@ struct DashboardView: View {
     @Binding var showChange: Bool
     @Binding var showTargetApps: Bool
     @Binding var rollbackTarget: DeviceProfile?
+    @State private var showProfileSettings = false
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -102,7 +103,21 @@ struct DashboardView: View {
                     let recent = store.profiles.filter { $0.id != store.activeID }.sorted { $0.createdAt > $1.createdAt }.prefix(3)
                     if recent.isEmpty { Text("Chưa có profile gần đây").foregroundStyle(.secondary).padding() }
                     ForEach(Array(recent)) { profile in
-                        H2Card { HStack(spacing: 12) { PhoneGlyph(); VStack(alignment: .leading, spacing: 4) { Text(profile.name).font(.headline); Text(profile.createdAt.h2Text).font(.caption).foregroundStyle(.secondary); Text("\(profile.model) • iOS \(profile.ios)").font(.caption) }; Spacer(minLength: 4); Button { rollbackTarget = profile } label: { Image(systemName: "arrow.uturn.backward.circle.fill").font(.title2) }.accessibilityLabel("Quay lại \(profile.name)") } }
+                        H2Card {
+                            HStack(spacing: 12) {
+                                PhoneGlyph()
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(profile.name).font(.headline)
+                                    Text(profile.createdAt.h2Text).font(.caption).foregroundStyle(.secondary)
+                                    Text("\(profile.model) • iOS \(profile.ios)").font(.caption)
+                                }
+                                Spacer(minLength: 4)
+                            }
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 18))
+                        .onTapGesture { rollbackTarget = profile }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityLabel("Quay lại \(profile.name)")
                     }
                 }
                 }.padding(20)
@@ -110,6 +125,9 @@ struct DashboardView: View {
             .background(Palette.background)
             .foregroundStyle(Palette.ink)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(isPresented: $showProfileSettings) {
+                ProfileSettingsView()
+            }
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     HStack(spacing: 7) {
@@ -121,6 +139,12 @@ struct DashboardView: View {
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("H2PHONE")
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showProfileSettings = true } label: {
+                        Image(systemName: "gearshape.fill")
+                    }
+                    .accessibilityLabel("Cài đặt tạo Profile")
                 }
             }
         }

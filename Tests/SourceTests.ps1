@@ -17,6 +17,12 @@ $targetAppViews = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Features
 $swiftStore = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Core/H2Store.swift')
 $swiftModels = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Models/H2Models.swift')
 $swiftDeviceService = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Services/DeviceService.swift')
+$profileSettingsModelPath = Join-Path $repoRoot 'H2PhoneSwiftUI/Models/ProfileGenerationSettings.swift'
+$profileSettingsModel = if (Test-Path $profileSettingsModelPath) { Get-Content -Raw $profileSettingsModelPath } else { '' }
+$profileSettingsServicePath = Join-Path $repoRoot 'H2PhoneSwiftUI/Services/ProfileSettingsService.swift'
+$profileSettingsService = if (Test-Path $profileSettingsServicePath) { Get-Content -Raw $profileSettingsServicePath } else { '' }
+$profileSettingsViewPath = Join-Path $repoRoot 'H2PhoneSwiftUI/Features/ProfileSettingsView.swift'
+$profileSettingsView = if (Test-Path $profileSettingsViewPath) { Get-Content -Raw $profileSettingsViewPath } else { '' }
 $installedAppServicePath = Join-Path $repoRoot 'H2PHONE/H2InstalledAppService.m'
 $installedAppService = if (Test-Path $installedAppServicePath) { Get-Content -Raw $installedAppServicePath } else { '' }
 $bridgingHeaderPath = Join-Path $repoRoot 'H2PHONE/H2PHONE-Bridging-Header.h'
@@ -116,6 +122,32 @@ Assert-SourceContains $dashboardViews '(?s)ToolbarItem\s*\(placement:\s*\.princi
     'The cat icon and H2PHONE title must form a centered dashboard header.'
 Assert-SourceContains $dashboardViews '(?s)struct\s+ProfilesView.*?onTapGesture\s*\{\s*if\s+profile\.id\s*!=\s*store\.activeID\s*\{\s*rollbackTarget\s*=\s*profile' `
     'Inactive profile cards must open rollback confirmation when tapped.'
+Assert-SourceContains $dashboardViews '(?s)let\s+recent\s*=.*?ForEach\(Array\(recent\)\).*?H2Card.*?contentShape\(RoundedRectangle\(cornerRadius:\s*18\)\).*?onTapGesture\s*\{\s*rollbackTarget\s*=\s*profile' `
+    'Recent profile cards must open rollback confirmation when the card is tapped.'
+if ($dashboardViews -match 'arrow\.uturn\.backward\.circle\.fill') {
+    throw 'Recent profile cards must not show a redundant rollback icon.'
+}
+Assert-SourceContains $profileSettingsModel 'struct\s+ProfileGenerationSettings:\s*Codable,\s*Equatable' `
+    'Profile generation settings must be persistable and value-comparable.'
+Assert-SourceContains $profileSettingsModel '(?s)iPhone XS.*?iPhone 16 Pro Max.*?16\.0.*?18\.1' `
+    'Profile settings must expose the approved iPhone and iOS bounds.'
+Assert-SourceContains $profileSettingsModel '(?s)mutating\s+func\s+normalizeRanges.*?modelMinimumIndex.*?modelMaximumIndex.*?iosMinimumIndex.*?iosMaximumIndex' `
+    'Profile settings must normalize inverted model and iOS ranges.'
+Assert-SourceContains $profileSettingsService '(?s)protocol\s+ProfileSettingsService.*?load\(\).*?save\(_\s+settings:\s*ProfileGenerationSettings\).*?UserDefaults' `
+    'Profile settings must use an injectable UserDefaults persistence service.'
+Assert-SourceContains $swiftStore '(?s)@Published\s+var\s+generationSettings:\s*ProfileGenerationSettings.*?func\s+updateGenerationSettings.*?settingsService\.save' `
+    'H2Store must publish and automatically persist generation settings.'
+Assert-SourceContains $phoneMakefile '(?s)ProfileSettingsView\.swift.*?ProfileGenerationSettings\.swift.*?ProfileSettingsService\.swift' `
+    'The Theos application must compile every Profile settings source file.'
+Assert-SourceContains $dashboardViews '(?s)@State\s+private\s+var\s+showProfileSettings.*?navigationDestination\(isPresented:\s*\$showProfileSettings\).*?ProfileSettingsView\(\).*?Image\(systemName:\s*"gearshape\.fill"\)' `
+    'Dashboard gear navigation must open Profile settings.'
+Assert-SourceContains $profileSettingsView '(?s)ScrollView.*?Model iPhone.*?Phiên bản iOS.*?Nhà mạng.*?Vùng.*?Ngôn ngữ & múi giờ' `
+    'Profile settings must provide all five approved random-field toggles in a scrollable screen.'
+Assert-SourceContains $profileSettingsView '(?s)Picker\("Từ iPhone".*?Picker\("Đến iPhone".*?Picker\("Từ iOS".*?Picker\("Đến iOS"' `
+    'Profile settings must provide minimum and maximum pickers for iPhone and iOS.'
+if ($profileSettingsView -match 'Button\s*\(\s*"Lưu"') { throw 'Profile settings must auto-save without a Save button.' }
+Assert-SourceContains $targetAppViews '(?s)generationSettings\.enabledFieldNames.*?modelRangeText.*?iosRangeText' `
+    'Change confirmation must summarize enabled random fields and ranges.'
 if ($dashboardViews -match 'Button\s*\(\s*"Quay lại bản này"') {
     throw 'Profile cards must not show a separate rollback button.'
 }
@@ -137,6 +169,13 @@ Assert-SourceContains $targetAppViews '\.task\s*\{\s*await\s+store\.discover' `
     'The target-app tab must discover installed apps when it opens.'
 Assert-SourceContains $targetAppViews 'AppIconView\s*\(app:\s*app\)' `
     'Target app cards must render a reusable real-icon view.'
+Assert-SourceContains $targetAppViews '(?s)struct\s+AppIconView.*?NSCache<NSString,\s*UIImage>' `
+    'Decoded application icons must be cached across app-row updates.'
+Assert-SourceContains $targetAppViews '(?s)struct\s+AppIconView.*?@State\s+private\s+var\s+decodedIcon:\s*UIImage\?.*?Task\.detached.*?UIImage\(data:' `
+    'Application icons must decode away from the main interaction thread.'
+if ($targetAppViews -match 'if\s+let\s+data\s*=\s*app\.iconPNGData,\s*let\s+image\s*=\s*UIImage\(data:') {
+    throw 'AppIconView body must not synchronously decode PNG data during every toggle update.'
+}
 Assert-SourceContains $dashboardViews '(?s)struct\s+ProfilesView.*?List\s*\{.*?swipeActions.*?role:\s*\.destructive' `
     'Profile history must expose a destructive swipe action.'
 Assert-SourceContains $swiftStore '(?s)func\s+deleteProfile.*?profile\.id\s*!=\s*activeID.*?!profile\.isOriginal' `
@@ -206,4 +245,4 @@ Assert-SourceContains $releaseWorkflow '(?s)gh release create.*packages/com\.h2p
 Assert-SourceContains $buildDocs '(?s)1\. Update the package version in `control`\..*2\. Commit and push source changes to `develop`\.' `
     'Release instructions must commit the updated package version before tagging.'
 
-Write-Output 'Source tests passed: 94 assertions.'
+Write-Output 'Source tests passed: 110 assertions.'

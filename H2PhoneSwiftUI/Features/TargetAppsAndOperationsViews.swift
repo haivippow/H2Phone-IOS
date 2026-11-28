@@ -86,12 +86,14 @@ struct AppRow: View {
 }
 
 struct AppIconView: View {
+    private static let iconCache = NSCache<NSString, UIImage>()
     let app: TargetApp
+    @State private var decodedIcon: UIImage?
 
     var body: some View {
         Group {
-            if let data = app.iconPNGData, let image = UIImage(data: data) {
-                Image(uiImage: image).resizable().scaledToFill()
+            if let decodedIcon {
+                Image(uiImage: decodedIcon).resizable().scaledToFill()
             } else {
                 Image(systemName: app.symbol)
                     .resizable()
@@ -104,6 +106,20 @@ struct AppIconView: View {
         .frame(width: 54, height: 54)
         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(Color.black.opacity(0.06)) }
+        .task(id: app.id) {
+            let cacheKey = app.id as NSString
+            if let cached = Self.iconCache.object(forKey: cacheKey) {
+                decodedIcon = cached
+                return
+            }
+            guard let data = app.iconPNGData else { return }
+            let image = await Task.detached(priority: .userInitiated) {
+                UIImage(data: data)
+            }.value
+            guard let image else { return }
+            Self.iconCache.setObject(image, forKey: cacheKey)
+            decodedIcon = image
+        }
     }
 }
 
@@ -166,6 +182,15 @@ struct ChangeSheet: View {
                         Text(store.selectedApps.map(\.name).joined(separator: ", ").isEmpty ? "Chưa chọn ứng dụng" : store.selectedApps.map(\.name).joined(separator: ", "))
                         Text("Dung lượng cần backup: \(unknownSize ? "Chưa xác định" : backupApps.compactMap(\.dataBytes).reduce(0, +).h2Size)").font(.caption).foregroundStyle(.secondary)
                     } }
+                    H2Card {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Thông tin sẽ random").font(.headline)
+                            Text(store.generationSettings.enabledFieldNames.isEmpty ? "Không random trường nào" : store.generationSettings.enabledFieldNames.joined(separator: ", "))
+                                .font(.subheadline)
+                            if store.generationSettings.randomizeModel { Label(store.generationSettings.modelRangeText, systemImage: "iphone").font(.caption).foregroundStyle(.secondary) }
+                            if store.generationSettings.randomizeIOS { Label(store.generationSettings.iosRangeText, systemImage: "square.stack.3d.up").font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }
                     Label("Dữ liệu chỉ được làm sạch sau khi backup được xác minh thành công. Nếu backup lỗi, Change sẽ dừng lại.", systemImage: "checkmark.shield.fill").font(.caption).foregroundStyle(Palette.blue)
                     Label("Chưa khả dụng trên bản UI: cần service đóng app, backup, xác minh, làm sạch và áp dụng profile.", systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
                     HStack { Button("Hủy") { dismiss() }.frame(maxWidth: .infinity); Button("Thực hiện") { let value = name.trimmingCharacters(in: .whitespacesAndNewlines); dismiss(); Task { await store.change(name: value.isEmpty ? store.nextName : value) } }.buttonStyle(.borderedProminent).tint(Palette.blue).frame(maxWidth: .infinity) }

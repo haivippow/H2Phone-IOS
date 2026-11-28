@@ -8,10 +8,13 @@ H2PHONE_SWIFT_FILES = \
     ../H2PhoneSwiftUI/Core/DesignSystem.swift \
     ../H2PhoneSwiftUI/Core/H2Store.swift \
     ../H2PhoneSwiftUI/Features/DashboardAndProfilesViews.swift \
+    ../H2PhoneSwiftUI/Features/ProfileSettingsView.swift \
     ../H2PhoneSwiftUI/Features/TargetAppsAndOperationsViews.swift \
     ../H2PhoneSwiftUI/Models/H2Models.swift \
+    ../H2PhoneSwiftUI/Models/ProfileGenerationSettings.swift \
     ../H2PhoneSwiftUI/Preview/PreviewData.swift \
-    ../H2PhoneSwiftUI/Services/DeviceService.swift
+    ../H2PhoneSwiftUI/Services/DeviceService.swift \
+    ../H2PhoneSwiftUI/Services/ProfileSettingsService.swift
 H2PHONE_CFLAGS = -fobjc-arc
 H2PHONE_SWIFTFLAGS = -D THEOS
 H2PHONE_SWIFT_VERSION = 5

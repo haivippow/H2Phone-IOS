@@ -6,18 +6,23 @@ final class H2Store: ObservableObject {
     @Published var profiles: [DeviceProfile]
     @Published var activeID: UUID
     @Published var apps: [TargetApp]
+    @Published var generationSettings: ProfileGenerationSettings
     @Published var operation: OperationState = .idle
     @Published var discoveryMessage = "Dữ liệu minh họa • Chưa kết nối quyền đọc ứng dụng trên thiết bị"
 
     private let service: DeviceService
+    private let settingsService: ProfileSettingsService
     private var hasDiscoveredApps = false
 
     init(
         service: DeviceService,
+        settingsService: ProfileSettingsService = UserDefaultsProfileSettingsService(),
         profiles: [DeviceProfile] = PreviewData.profiles,
         apps: [TargetApp] = PreviewData.apps
     ) {
         self.service = service
+        self.settingsService = settingsService
+        self.generationSettings = settingsService.load()
         self.profiles = profiles
         self.activeID = profiles.first?.id ?? UUID()
         self.apps = apps
@@ -29,6 +34,13 @@ final class H2Store: ObservableObject {
 
     func update(_ app: TargetApp) {
         if let index = apps.firstIndex(where: { $0.id == app.id }) { apps[index] = app }
+    }
+
+    func updateGenerationSettings(_ settings: ProfileGenerationSettings) {
+        var normalized = settings
+        normalized.normalizeRanges()
+        generationSettings = normalized
+        settingsService.save(normalized)
     }
 
     func discover() async {
