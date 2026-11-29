@@ -6,18 +6,18 @@ struct RootView: View {
     @EnvironmentObject private var store: H2Store
     @State private var tab = 0
     @State private var showChange = false
-    @State private var showTargetApps = false
     @State private var rollbackTarget: DeviceProfile?
     var body: some View {
         TabView(selection: $tab) {
-            DashboardView(tab: $tab, showChange: $showChange, showTargetApps: $showTargetApps, rollbackTarget: $rollbackTarget)
+            DashboardView(tab: $tab, showChange: $showChange, rollbackTarget: $rollbackTarget)
                 .tabItem { Label("Điều khiển", systemImage: "house.fill") }.tag(0)
-            ProfilesView(rollbackTarget: $rollbackTarget)
-                .tabItem { Label("Profile", systemImage: "square.stack.fill") }.tag(1)
+            AppsView()
+                .tabItem { Label("APP", systemImage: "square.grid.2x2.fill") }.tag(1)
+            NavigationStack { ProfileSettingsView() }
+                .tabItem { Label("Setting", systemImage: "slider.horizontal.3") }.tag(2)
         }
         .tint(Palette.blue)
         .sheet(isPresented: $showChange) { ChangeSheet().environmentObject(store).presentationDetents([.medium, .large]) }
-        .sheet(isPresented: $showTargetApps) { AppsView().environmentObject(store).presentationDetents([.large]) }
         .sheet(item: $rollbackTarget) { RollbackSheet(profile: $0).environmentObject(store).presentationDetents([.large]) }
         .alert("Trạng thái", isPresented: Binding(get: { if case .unavailable = store.operation { return true }; if case .error = store.operation { return true }; if case .success = store.operation { return true }; return false }, set: { if !$0 { store.operation = .idle } })) {
             Button("Đóng", role: .cancel) { store.operation = .idle }
@@ -66,9 +66,8 @@ struct DashboardView: View {
     @EnvironmentObject private var store: H2Store
     @Binding var tab: Int
     @Binding var showChange: Bool
-    @Binding var showTargetApps: Bool
     @Binding var rollbackTarget: DeviceProfile?
-    @State private var showProfileSettings = false
+    @State private var showProfiles = false
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -94,12 +93,12 @@ struct DashboardView: View {
                         }
                     }.background(Palette.pale, in: RoundedRectangle(cornerRadius: 18))
                 } else { EmptyState(title: "Chưa có Profile", symbol: "iphone") }
-                Button { showTargetApps = true } label: {
+                Button { tab = 1 } label: {
                     H2Card { HStack(spacing: 12) { Image(systemName: "square.stack.3d.up.fill").foregroundStyle(Palette.blue); VStack(alignment: .leading, spacing: 3) { Text("Đang áp dụng cho \(store.selectedApps.count) ứng dụng").font(.subheadline.bold()); Text(store.selectedApps.map(\.name).joined(separator: ", ")).font(.caption).foregroundStyle(.secondary).lineLimit(1) }; Spacer(); Image(systemName: "chevron.right") } }
                 }.buttonStyle(.plain)
                 Button { showChange = true } label: { Label("Change", systemImage: "arrow.triangle.2.circlepath").font(.title3.bold()).frame(maxWidth: .infinity).padding(17).foregroundStyle(.white).background(Palette.blue, in: RoundedRectangle(cornerRadius: 16)) }
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack { Text("Profile gần đây").font(.title3.bold()); Spacer(); Button("Xem tất cả") { tab = 1 }.font(.subheadline) }
+                    HStack { Text("Profile gần đây").font(.title3.bold()); Spacer(); Button("Xem tất cả") { showProfiles = true }.font(.subheadline) }
                     let recent = store.profiles.filter { $0.id != store.activeID }.sorted { $0.createdAt > $1.createdAt }.prefix(3)
                     if recent.isEmpty { Text("Chưa có profile gần đây").foregroundStyle(.secondary).padding() }
                     ForEach(Array(recent)) { profile in
@@ -125,8 +124,8 @@ struct DashboardView: View {
             .background(Palette.background)
             .foregroundStyle(Palette.ink)
             .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(isPresented: $showProfileSettings) {
-                ProfileSettingsView()
+            .navigationDestination(isPresented: $showProfiles) {
+                ProfilesView(rollbackTarget: $rollbackTarget)
             }
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -139,12 +138,6 @@ struct DashboardView: View {
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("H2PHONE")
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showProfileSettings = true } label: {
-                        Image(systemName: "gearshape.fill")
-                    }
-                    .accessibilityLabel("Cài đặt tạo Profile")
                 }
             }
         }
@@ -159,8 +152,7 @@ struct ProfilesView: View {
     @State private var profilePendingDeletion: DeviceProfile?
     private var filtered: [DeviceProfile] { store.profiles.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || $0.model.localizedCaseInsensitiveContains(query) }.sorted { $0.createdAt > $1.createdAt } }
     var body: some View {
-        NavigationStack {
-            List {
+        List {
                 if filtered.isEmpty {
                     EmptyState(title: "Không tìm thấy Profile", symbol: "magnifyingglass")
                         .listRowBackground(Color.clear)
@@ -199,13 +191,13 @@ struct ProfilesView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Palette.background)
-            .navigationTitle("Lịch sử Profile")
-            .searchable(text: $query, prompt: "Tên profile hoặc dòng máy")
-            .alert(
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Palette.background)
+        .navigationTitle("Lịch sử Profile")
+        .searchable(text: $query, prompt: "Tên profile hoặc dòng máy")
+        .alert(
                 "Xóa Profile?",
                 isPresented: Binding(
                     get: { profilePendingDeletion != nil },
@@ -218,9 +210,8 @@ struct ProfilesView: View {
                     store.deleteProfile(profile)
                     profilePendingDeletion = nil
                 }
-            } message: { profile in
-                Text("Profile \(profile.name) sẽ bị xóa khỏi lịch sử.")
-            }
+        } message: { profile in
+            Text("Profile \(profile.name) sẽ bị xóa khỏi lịch sử.")
         }
     }
 }

@@ -6,7 +6,6 @@ enum AppFilter: String, CaseIterable { case all = "Tất cả", selected = "Đã
 
 struct AppsView: View {
     @EnvironmentObject private var store: H2Store
-    @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var filter: AppFilter = .all
     @State private var detail: TargetApp?
@@ -41,7 +40,6 @@ struct AppsView: View {
                 }.padding(16)
             }.background(Palette.background).navigationTitle("Ứng dụng áp dụng").navigationBarTitleDisplayMode(.inline).searchable(text: $query, prompt: "Tìm ứng dụng đã cài")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) { Button("Đóng") { dismiss() } }
                     ToolbarItem(placement: .navigationBarTrailing) { Button { Task { await store.discover() } } label: { Image(systemName: "arrow.clockwise") }.accessibilityLabel("Quét ứng dụng") }
                 }
                 .sheet(item: $detail) { AppDetailView(bundleID: $0.id).environmentObject(store).presentationDetents([.medium]) }
@@ -77,7 +75,8 @@ struct AppRow: View {
                 VStack(spacing: 12) {
                     AppSettingToggle(symbol: "iphone.gen3.radiowaves.left.and.right", title: "Fake Info", subtitle: "Áp dụng thông tin Profile cho app", isOn: binding(\.fakeInfo))
                     Divider()
-                    AppSettingToggle(symbol: "externaldrive", title: "Backup & Làm sạch", subtitle: "Chỉ làm sạch sau khi backup được xác minh thành công", isOn: binding(\.backupData))
+                    AppSettingToggle(symbol: "externaldrive", title: "Backup & Làm sạch", subtitle: "Tính năng chưa khả dụng trong bản này", isOn: binding(\.backupData))
+                        .disabled(true)
                 }
             }
         }
@@ -154,9 +153,9 @@ struct AppDetailView: View {
                     Section { Text(app.id).font(.caption); Text("Dữ liệu cục bộ: \(app.dataBytes?.h2Size ?? "Chưa xác định")") }
                     Section("Cấu hình") {
                         Toggle("Fake Info", isOn: binding(\.fakeInfo))
-                        Toggle("Backup & Làm sạch", isOn: binding(\.backupData))
+                        Toggle("Backup & Làm sạch", isOn: binding(\.backupData)).disabled(true)
                     }
-                    if app.backupData { Section { Label("H2PHONE sẽ backup, xác minh rồi mới làm sạch dữ liệu khi Change.", systemImage: "checkmark.shield.fill").foregroundStyle(Palette.blue) } }
+                    Section { Label("Backup & Làm sạch chưa khả dụng; Change hiện chỉ kích hoạt fake profile.", systemImage: "info.circle").foregroundStyle(.secondary) }
                 }
             }.navigationTitle(app?.name ?? "Ứng dụng").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Đóng") { dismiss() } } }
         }
@@ -168,19 +167,22 @@ struct ChangeSheet: View {
     @EnvironmentObject private var store: H2Store
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
+    private var fakeApps: [TargetApp] { store.apps.filter(\.fakeInfo) }
     private var backupApps: [TargetApp] { store.apps.filter { $0.backupData } }
-    private var unknownSize: Bool { backupApps.contains { $0.dataBytes == nil } }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     TextField("Tên Profile mới", text: $name).textFieldStyle(.roundedBorder)
-                    Label("Profile hiện tại sẽ được lưu snapshot trước khi tạo profile mới.", systemImage: "square.stack.3d.up").font(.subheadline)
+                    Label("H2PHONE sẽ tạo profile nhất quán và kích hoạt ngay cho các app bật Fake Info.", systemImage: "checkmark.shield.fill").font(.subheadline)
                     H2Card { VStack(alignment: .leading, spacing: 8) {
                         Text("Ứng dụng bị ảnh hưởng").font(.headline)
-                        Text("Backup & làm sạch: \(backupApps.count) ứng dụng")
-                        Text(store.selectedApps.map(\.name).joined(separator: ", ").isEmpty ? "Chưa chọn ứng dụng" : store.selectedApps.map(\.name).joined(separator: ", "))
-                        Text("Dung lượng cần backup: \(unknownSize ? "Chưa xác định" : backupApps.compactMap(\.dataBytes).reduce(0, +).h2Size)").font(.caption).foregroundStyle(.secondary)
+                        Text("Áp dụng fake profile: \(fakeApps.count) ứng dụng")
+                        Text(fakeApps.map(\.name).joined(separator: ", ").isEmpty ? "Hãy bật Fake Info cho ít nhất một app" : fakeApps.map(\.name).joined(separator: ", "))
+                        if !backupApps.isEmpty {
+                            Text("Backup & Làm sạch đã chọn cho \(backupApps.count) app nhưng chưa được thực thi trong bản này.")
+                                .font(.caption).foregroundStyle(.orange)
+                        }
                     } }
                     H2Card {
                         VStack(alignment: .leading, spacing: 8) {
@@ -191,9 +193,8 @@ struct ChangeSheet: View {
                             if store.generationSettings.randomizeIOS { Label(store.generationSettings.iosRangeText, systemImage: "square.stack.3d.up").font(.caption).foregroundStyle(.secondary) }
                         }
                     }
-                    Label("Dữ liệu chỉ được làm sạch sau khi backup được xác minh thành công. Nếu backup lỗi, Change sẽ dừng lại.", systemImage: "checkmark.shield.fill").font(.caption).foregroundStyle(Palette.blue)
-                    Label("Chưa khả dụng trên bản UI: cần service đóng app, backup, xác minh, làm sạch và áp dụng profile.", systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
-                    HStack { Button("Hủy") { dismiss() }.frame(maxWidth: .infinity); Button("Thực hiện") { let value = name.trimmingCharacters(in: .whitespacesAndNewlines); dismiss(); Task { await store.change(name: value.isEmpty ? store.nextName : value) } }.buttonStyle(.borderedProminent).tint(Palette.blue).frame(maxWidth: .infinity) }
+                    Label("Change thực hiện native activation; không xóa dữ liệu ứng dụng.", systemImage: "info.circle").font(.caption).foregroundStyle(Palette.blue)
+                    HStack { Button("Hủy") { dismiss() }.frame(maxWidth: .infinity); Button("Áp dụng fake profile") { let value = name.trimmingCharacters(in: .whitespacesAndNewlines); dismiss(); Task { await store.change(name: value.isEmpty ? store.nextName : value) } }.buttonStyle(.borderedProminent).tint(Palette.blue).frame(maxWidth: .infinity).disabled(fakeApps.isEmpty) }
                 }.padding(20)
             }.background(Palette.background).navigationTitle("Xác nhận Change").navigationBarTitleDisplayMode(.inline)
                 .onAppear { name = store.nextName }
@@ -233,7 +234,7 @@ struct RollbackSheet: View {
                     }
                     Toggle("Backup trạng thái hiện tại trước khi quay lại", isOn: $backupCurrent).tint(Palette.blue)
                     Label("Dữ liệu chưa có bản backup có thể bị mất khi khôi phục.", systemImage: "exclamationmark.triangle.fill").font(.subheadline).foregroundStyle(.orange)
-                    Label("Chưa khả dụng trên bản UI: chỉ báo hoàn tất khi service khôi phục trả về thành công.", systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
+                    Label("Khôi phục dữ liệu ứng dụng chưa được kết nối trong bản này.", systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
                 }.padding(20)
             }.background(Palette.background).navigationTitle("Xác nhận quay lại").navigationBarTitleDisplayMode(.inline)
                 .safeAreaInset(edge: .bottom) {
@@ -248,6 +249,7 @@ struct RollbackSheet: View {
                         .buttonStyle(.borderedProminent)
                         .tint(Palette.blue)
                         .frame(maxWidth: .infinity)
+                        .disabled(true)
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)

@@ -171,8 +171,11 @@ Assert-SourceContains $swiftStore '(?s)@Published\s+var\s+generationSettings:\s*
     'H2Store must publish and automatically persist generation settings.'
 Assert-SourceContains $phoneMakefile '(?s)ProfileSettingsView\.swift.*?ProfileGenerationSettings\.swift.*?ProfileSettingsService\.swift' `
     'The Theos application must compile every Profile settings source file.'
-Assert-SourceContains $dashboardViews '(?s)@State\s+private\s+var\s+showProfileSettings.*?navigationDestination\(isPresented:\s*\$showProfileSettings\).*?ProfileSettingsView\(\).*?Image\(systemName:\s*"gearshape\.fill"\)' `
-    'Dashboard gear navigation must open Profile settings.'
+Assert-SourceContains $dashboardViews '(?s)TabView.*?house\.fill.*?AppsView\(\).*?square\.grid\.2x2\.fill.*?ProfileSettingsView\(\).*?slider\.horizontal\.3' `
+    'RootView must expose Điều khiển, APP, and Setting as three persistent tabs.'
+if ($dashboardViews -match 'showProfileSettings|gearshape\.fill|showTargetApps') {
+    throw 'Primary APP and Setting navigation must not remain hidden behind dashboard state or toolbar buttons.'
+}
 Assert-SourceContains ($profileSettingsView + $profileSettingsModel) '(?s)ScrollView.*?Model, ProductType & Board.*?Phiên bản iOS.*?Nhà mạng, MCC, MNC & quốc gia.*?Tọa độ latitude & longitude.*?Múi giờ' `
     'Profile settings must provide all five approved random-field toggles in a scrollable screen.'
 Assert-SourceContains $profileSettingsView '(?s)Picker\("Từ iPhone".*?Picker\("Đến iPhone".*?Picker\("Từ iOS".*?Picker\("Đến iOS"' `
@@ -219,8 +222,10 @@ Assert-SourceContains $swiftModels 'var\s+isSelected:\s*Bool\s*\{\s*fakeInfo\s*\
 if ($swiftModels -match 'resetOnChange') { throw 'The separate resetOnChange model option must be removed.' }
 Assert-SourceContains $targetAppViews 'title:\s*"Backup\s*&' `
     'The app UI must present the combined Backup and Clean choice.'
-Assert-SourceContains $targetAppViews 'subtitle:\s*"Ch.*backup.*x.*c minh.*th.*nh c.*ng' `
-    'The app UI must explain the verified-backup safety rule.'
+Assert-SourceContains $targetAppViews '(?s)title:\s*"Backup\s*&.*?\.disabled\(true\)' `
+    'Unavailable Backup and Clean controls must be visibly disabled.'
+Assert-SourceContains $targetAppViews '(?s)store\.restore\(profile,\s*backupCurrent:\s*backupCurrent\).*?\.disabled\(true\)' `
+    'Unavailable rollback execution must be visibly disabled.'
 if ($targetAppViews -match 'Reset Data on Change|resetOnChange|Reset không có backup') {
     throw 'The app UI must not expose a separate or unsafe reset option.'
 }
@@ -232,15 +237,11 @@ Assert-SourceContains $targetAppViews '\.safeAreaInset\s*\(edge:\s*\.bottom\)' `
     'Rollback actions must stay visible above the bottom safe area.'
 Assert-SourceContains $dashboardViews '(?s)RollbackSheet\(profile:\s*\$0\).*?presentationDetents\s*\(\[\.large\]\)' `
     'Rollback confirmation must open at the large sheet detent.'
-if ($dashboardViews -match 'tabItem\s*\{\s*Label\(\s*"App mục tiêu"') {
-    throw 'Target apps must not occupy a bottom-tab item.'
+Assert-SourceContains $dashboardViews '(?s)showProfiles.*?navigationDestination\(isPresented:\s*\$showProfiles\).*?ProfilesView' `
+    'Full profile history must remain reachable from the control tab.'
+if ($targetAppViews -match 'navigationBarLeading.*?dismiss\(\)') {
+    throw 'The APP tab must not render modal close controls.'
 }
-Assert-SourceContains $dashboardViews '(?s)@State\s+private\s+var\s+showTargetApps.*?sheet\s*\(isPresented:\s*\$showTargetApps\).*?AppsView\(\).*?presentationDetents\s*\(\[\.large\]\)' `
-    'RootView must present target-app management as a large sheet.'
-Assert-SourceContains $dashboardViews 'Button\s*\{\s*showTargetApps\s*=\s*true\s*\}' `
-    'The dashboard app scope card must open the target-app sheet.'
-Assert-SourceContains $targetAppViews '(?s)navigationBarLeading.*?dismiss\(\)' `
-    'The target-app sheet must provide an explicit close button.'
 Assert-SourceContains $dashboardViews '(?s)struct\s+DashboardView.*?NavigationStack\s*\{.*?ToolbarItem\s*\(placement:\s*\.principal\)' `
     'The dashboard must use a compact centered navigation header.'
 Assert-SourceContains $dashboardViews '(?s)ToolbarItem\s*\(placement:\s*\.principal\).*?H2BrandIcon\(\).*?frame\(width:\s*28,\s*height:\s*28\).*?Text\("H2PHONE"\)' `
@@ -260,6 +261,11 @@ Assert-SourceContains $swiftDeviceService '(?s)func\s+change\(to\s+name:\s*Strin
     'Change must generate a coherent profile from settings and activate it through the native bridge.'
 Assert-SourceContains $swiftStore 'service\.change\(to:\s*name,\s*apps:\s*selectedApps,\s*settings:\s*generationSettings\)' `
     'H2Store must pass persisted generation settings into Change.'
+Assert-SourceContains $targetAppViews '(?s)fakeApps.*?Button\(.*?store\.change' `
+    'Change confirmation must describe and execute real fake-profile activation.'
+if ($targetAppViews -match 'Chưa khả dụng trên bản UI') {
+    throw 'Change and rollback screens must not show stale blanket-unavailable copy.'
+}
 Assert-SourceContains $targetAppViews '(?s)ScrollView\s*\{\s*LazyVStack\(alignment:\s*\.leading' `
     'The target-app sheet must lazily construct application cards.'
 Assert-SourceContains $devMakefile '(?s)ifeq\s*\(\$\(THEOS_PACKAGE_SCHEME\),roothide\).*?H2DEV_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2DEV/H2DEV\.entitlements.*?endif' `
