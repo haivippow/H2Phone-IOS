@@ -17,6 +17,8 @@ $targetAppViews = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Features
 $swiftStore = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Core/H2Store.swift')
 $swiftModels = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Models/H2Models.swift')
 $swiftDeviceService = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Services/DeviceService.swift')
+$deviceProfileGenerator = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Services/DeviceProfileGenerator.swift')
+$generatedDeviceProfile = Get-Content -Raw (Join-Path $repoRoot 'H2PhoneSwiftUI/Models/GeneratedDeviceProfile.swift')
 $profileSettingsModelPath = Join-Path $repoRoot 'H2PhoneSwiftUI/Models/ProfileGenerationSettings.swift'
 $profileSettingsModel = if (Test-Path $profileSettingsModelPath) { Get-Content -Raw $profileSettingsModelPath } else { '' }
 $profileSettingsServicePath = Join-Path $repoRoot 'H2PhoneSwiftUI/Services/ProfileSettingsService.swift'
@@ -25,6 +27,8 @@ $profileSettingsViewPath = Join-Path $repoRoot 'H2PhoneSwiftUI/Features/ProfileS
 $profileSettingsView = if (Test-Path $profileSettingsViewPath) { Get-Content -Raw $profileSettingsViewPath } else { '' }
 $installedAppServicePath = Join-Path $repoRoot 'H2PHONE/H2InstalledAppService.m'
 $installedAppService = if (Test-Path $installedAppServicePath) { Get-Content -Raw $installedAppServicePath } else { '' }
+$activationServicePath = Join-Path $repoRoot 'H2PHONE/H2ProfileActivationService.m'
+$activationService = if (Test-Path $activationServicePath) { Get-Content -Raw $activationServicePath } else { '' }
 $bridgingHeaderPath = Join-Path $repoRoot 'H2PHONE/H2PHONE-Bridging-Header.h'
 $bridgingHeader = if (Test-Path $bridgingHeaderPath) { Get-Content -Raw $bridgingHeaderPath } else { '' }
 $devEntitlementsPath = Join-Path $repoRoot 'H2DEV/H2DEV.entitlements'
@@ -75,6 +79,18 @@ Assert-SourceContains $plist 'com\.apple\.mobilesafari' `
 foreach ($key in @('memory', 'cores', 'screenWidth', 'screenHeight', 'screenScale', 'carrier', 'latitude', 'longitude', 'battery', 'build', 'darwin')) {
     Assert-SourceContains $config ('@"' + $key + '"') "Profiles must define $key."
 }
+Assert-SourceContains $config '(?s)@"schema":\s*@2.*?@"generatedProfile".*?NSPropertyListSerialization.*?NSDataWritingAtomic' `
+    'Generated profiles must be stored atomically in schema 2.'
+Assert-SourceContains $config '(?s)\[value\[@"schema"\]\s+isEqual:@1\].*?generatedProfile.*?enabledApps' `
+    'Schema-1 configs must migrate their preset and enabled applications.'
+Assert-SourceContains $tweak '(?s)H2Profile\(void\).*?config\[@"generatedProfile"\]' `
+    'The tweak must consume the generated profile directly from effective config.'
+Assert-SourceContains $activationService '(?s)activateProfile:.*?enabledApps:.*?activateGeneratedProfile' `
+    'The Swift bridge must activate a generated profile and its selected applications.'
+Assert-SourceContains $config '(?s)activateGeneratedProfile:.*?previousApps.*?unionSet.*?publishRuntimeStateForBundleID' `
+    'Profile activation must notify both newly selected and removed applications.'
+Assert-SourceContains $config '(?s)restoreOriginal:.*?@"enabled":\s*@\(NO\).*?@"generatedProfile":\s*current\[@"generatedProfile"\].*?NSDataWritingAtomic' `
+    'Restore Original must disable a generated profile without resolving it through legacy presets.'
 Assert-SourceContains $tweak 'physicalMemory' 'Selected apps must receive profile physical memory.'
 if ($tweak -match '%hook\s+UIScreen') {
     throw 'UIScreen must not be hooked because fake native bounds break app and Safari keyboard layout.'
@@ -137,6 +153,12 @@ Assert-SourceContains $profileSettingsModel '(?s)legacyModelOptions.*?legacyIOSO
     'Expanded catalogs must migrate indexes saved by the previous release.'
 Assert-SourceContains $profileSettingsModel '(?s)struct\s+DeviceCompatibility.*?minimumIOS.*?maximumIOS.*?compatibleIOSOptions' `
     'The model catalog must expose compatible iOS bounds instead of allowing impossible pairs.'
+Assert-SourceContains $deviceProfileGenerator '(?s)allowedNames.*?DeviceHardwareSpec\.forMarketingName.*?device\.firmwares\.filter.*?noCompatibleProfile' `
+    'Device generation must select only reviewed devices with compatible firmware.'
+Assert-SourceContains $deviceProfileGenerator '(?s)productType:\s*device\.identifier.*?board:\s*board.*?iosVersion:\s*firmware\.version.*?build:\s*firmware\.build.*?darwin:\s*firmware\.darwin' `
+    'A generated profile must keep ProductType, board, iOS build, and Darwin from one coherent selection.'
+Assert-SourceContains $generatedDeviceProfile '(?s)var\s+propertyList:.*?"model":\s*productType.*?"board":\s*board.*?"build":\s*build.*?"darwin":\s*darwin' `
+    'Generated profiles must expose the native keys consumed by the tweak.'
 Assert-SourceContains $profileSettingsModel '(?s)enum\s+ProfileRandomField.*?deviceName.*?deviceModel.*?iosVersion.*?idfv.*?idfa.*?imei.*?imei2.*?batteryLevel.*?timeZone.*?wifi.*?location.*?webGL' `
     'Profile settings must enumerate the full native and web fake capability catalog.'
 Assert-SourceContains $profileSettingsModel '(?s)enum\s+ProfileCapabilityGroup.*?device.*?operatingSystem.*?identifiers.*?batteryAndSystem.*?network.*?location.*?locale.*?sensors.*?webFingerprint' `
@@ -234,6 +256,10 @@ Assert-SourceContains $targetAppViews '(?s)LazyVGrid\(columns:\s*filterColumns.*
     'Target-app filters must use a small-screen-friendly grid.'
 Assert-SourceContains $swiftDeviceService '(?s)withCheckedContinuation.*?DispatchQueue\.global\(qos:\s*\.userInitiated\)\.async.*?installedApplications\(\)' `
     'Installed-app discovery and icon processing must run away from the main animation thread.'
+Assert-SourceContains $swiftDeviceService '(?s)func\s+change\(to\s+name:\s*String,\s*apps:\s*\[TargetApp\],\s*settings:\s*ProfileGenerationSettings\).*?generator\.generate\(settings:\s*settings\).*?H2ProfileActivationService\.activateProfile' `
+    'Change must generate a coherent profile from settings and activate it through the native bridge.'
+Assert-SourceContains $swiftStore 'service\.change\(to:\s*name,\s*apps:\s*selectedApps,\s*settings:\s*generationSettings\)' `
+    'H2Store must pass persisted generation settings into Change.'
 Assert-SourceContains $targetAppViews '(?s)ScrollView\s*\{\s*LazyVStack\(alignment:\s*\.leading' `
     'The target-app sheet must lazily construct application cards.'
 Assert-SourceContains $devMakefile '(?s)ifeq\s*\(\$\(THEOS_PACKAGE_SCHEME\),roothide\).*?H2DEV_CODESIGN_FLAGS\s*=\s*-S\$\(THEOS_PROJECT_DIR\)/H2DEV/H2DEV\.entitlements.*?endif' `
@@ -255,4 +281,4 @@ Assert-SourceContains $releaseWorkflow '(?s)gh release create.*packages/com\.h2p
 Assert-SourceContains $buildDocs '(?s)1\. Update the package version in `control`\..*2\. Commit and push source changes to `develop`\.' `
     'Release instructions must commit the updated package version before tagging.'
 
-Write-Output 'Source tests passed: 115 assertions.'
+Write-Output 'Source tests passed: 126 assertions.'

@@ -14,6 +14,26 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *runtimeTokens;
 @end
 
+static NSArray<NSString *> *H2NormalizedApps(id apps) {
+    if (![apps isKindOfClass:NSArray.class]) apps = @[H2TargetBundleID];
+    NSMutableArray<NSString *> *result = [NSMutableArray array];
+    for (id bundleID in apps) {
+        if (![bundleID isKindOfClass:NSString.class] || [bundleID length] == 0) continue;
+        NSString *migrated = [bundleID isEqualToString:@"com.h2phone.devicetest"] ? H2TargetBundleID : bundleID;
+        if (![result containsObject:migrated]) [result addObject:migrated];
+    }
+    return result;
+}
+
+static BOOL H2ValidGeneratedProfile(id value) {
+    if (![value isKindOfClass:NSDictionary.class]) return NO;
+    NSDictionary *profile = value;
+    for (NSString *key in @[@"name", @"model", @"board", @"ios", @"build", @"darwin", @"memory", @"cores", @"screenWidth", @"screenHeight", @"screenScale"]) {
+        if (!profile[key] || profile[key] == NSNull.null) return NO;
+    }
+    return [NSPropertyListSerialization propertyList:profile isValidForFormat:NSPropertyListBinaryFormat_v1_0];
+}
+
 @implementation H2ConfigManager
 
 + (NSArray<NSDictionary<NSString *, id> *> *)profiles {
@@ -43,20 +63,16 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
 - (NSDictionary<NSString *, id> *)snapshot {
     NSDictionary *value = [NSDictionary dictionaryWithContentsOfFile:H2ConfigPath];
     if (![value isKindOfClass:NSDictionary.class]) value = [NSDictionary dictionaryWithContentsOfFile:H2LegacyConfigPath];
-    if (![value isKindOfClass:NSDictionary.class] || ![value[@"schema"] isEqual:@1]) {
-        return @{ @"schema": @1, @"enabled": @(NO), @"profile": [H2ConfigManager profiles][0][@"name"], @"enabledApps": @[H2TargetBundleID] };
+    if ([value isKindOfClass:NSDictionary.class] && [value[@"schema"] isEqual:@2] && H2ValidGeneratedProfile(value[@"generatedProfile"])) {
+        NSDictionary *generatedProfile = value[@"generatedProfile"];
+        return @{ @"schema": @2, @"enabled": @([value[@"enabled"] boolValue]), @"profile": generatedProfile[@"name"], @"generatedProfile": generatedProfile, @"enabledApps": H2NormalizedApps(value[@"enabledApps"]) };
     }
-    NSString *profile = value[@"profile"];
-    profile = [H2ConfigManager profileNamed:profile][@"name"];
-    NSArray *apps = value[@"enabledApps"];
-    if (![apps isKindOfClass:NSArray.class]) apps = @[H2TargetBundleID];
-    NSMutableArray *validApps = [NSMutableArray array];
-    for (id bundleID in apps) {
-        if (![bundleID isKindOfClass:NSString.class] || [bundleID length] == 0) continue;
-        NSString *migrated = [bundleID isEqualToString:@"com.h2phone.devicetest"] ? H2TargetBundleID : bundleID;
-        if (![validApps containsObject:migrated]) [validApps addObject:migrated];
+    if ([value isKindOfClass:NSDictionary.class] && [value[@"schema"] isEqual:@1]) {
+        NSDictionary *generatedProfile = [H2ConfigManager profileNamed:value[@"profile"]];
+        return @{ @"schema": @2, @"enabled": @([value[@"enabled"] boolValue]), @"profile": generatedProfile[@"name"], @"generatedProfile": generatedProfile, @"enabledApps": H2NormalizedApps(value[@"enabledApps"]) };
     }
-    return @{ @"schema": @1, @"enabled": @([value[@"enabled"] boolValue]), @"profile": profile, @"enabledApps": validApps };
+    NSDictionary *generatedProfile = [H2ConfigManager profiles][0];
+    return @{ @"schema": @2, @"enabled": @(NO), @"profile": generatedProfile[@"name"], @"generatedProfile": generatedProfile, @"enabledApps": @[H2TargetBundleID] };
 }
 
 - (BOOL)saveEnabled:(BOOL)enabled profile:(NSString *)profile error:(NSError **)error {
@@ -64,7 +80,8 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
         if (error) *error = [NSError errorWithDomain:@"H2Config" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Unknown profile"}];
         return NO;
     }
-    NSDictionary *value = @{ @"schema": @1, @"enabled": @(enabled), @"profile": profile, @"enabledApps": [self snapshot][@"enabledApps"] };
+    NSDictionary *generatedProfile = [H2ConfigManager profileNamed:profile];
+    NSDictionary *value = @{ @"schema": @2, @"enabled": @(enabled), @"profile": profile, @"generatedProfile": generatedProfile, @"enabledApps": [self snapshot][@"enabledApps"] };
     NSData *data = [NSPropertyListSerialization dataWithPropertyList:value format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
     if (!data || ![data writeToFile:H2ConfigPath options:NSDataWritingAtomic error:error]) return NO;
     notify_post(H2ConfigChangedNotification.UTF8String);
@@ -73,9 +90,33 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
     return YES;
 }
 
+- (BOOL)activateGeneratedProfile:(NSDictionary<NSString *, id> *)profile enabledApps:(NSArray<NSString *> *)enabledApps error:(NSError **)error {
+    if (!H2ValidGeneratedProfile(profile)) {
+        if (error) *error = [NSError errorWithDomain:@"H2Config" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Generated device profile is incomplete."}];
+        return NO;
+    }
+    NSArray *previousApps = [self snapshot][@"enabledApps"];
+    NSArray *apps = H2NormalizedApps(enabledApps);
+    NSDictionary *value = @{ @"schema": @2, @"enabled": @(YES), @"profile": profile[@"name"], @"generatedProfile": profile, @"enabledApps": apps };
+    NSData *data = [NSPropertyListSerialization dataWithPropertyList:value format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
+    if (!data || ![data writeToFile:H2ConfigPath options:NSDataWritingAtomic error:error]) return NO;
+    notify_post(H2ConfigChangedNotification.UTF8String);
+    NSMutableSet<NSString *> *unionSet = [NSMutableSet setWithArray:previousApps];
+    [unionSet addObjectsFromArray:apps];
+    for (NSString *bundleID in unionSet) [self publishRuntimeStateForBundleID:bundleID];
+    [self appendLog:[NSString stringWithFormat:@"Generated profile activated: %@ / %@", profile[@"name"], profile[@"model"]]];
+    return YES;
+}
+
 - (BOOL)restoreOriginal:(NSError **)error {
     NSDictionary *current = [self snapshot];
-    return [self saveEnabled:NO profile:current[@"profile"] error:error];
+    NSDictionary *value = @{ @"schema": @2, @"enabled": @(NO), @"profile": current[@"profile"], @"generatedProfile": current[@"generatedProfile"], @"enabledApps": current[@"enabledApps"] };
+    NSData *data = [NSPropertyListSerialization dataWithPropertyList:value format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
+    if (!data || ![data writeToFile:H2ConfigPath options:NSDataWritingAtomic error:error]) return NO;
+    notify_post(H2ConfigChangedNotification.UTF8String);
+    [self publishRuntimeState];
+    [self appendLog:@"Config: OFF / restore original"];
+    return YES;
 }
 
 - (BOOL)setAppEnabled:(BOOL)enabled bundleID:(NSString *)bundleID error:(NSError **)error {
@@ -86,7 +127,7 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
     NSDictionary *current = [self snapshot];
     NSMutableOrderedSet *apps = [NSMutableOrderedSet orderedSetWithArray:current[@"enabledApps"]];
     if (enabled) [apps addObject:bundleID]; else [apps removeObject:bundleID];
-    NSDictionary *value = @{ @"schema": @1, @"enabled": current[@"enabled"], @"profile": current[@"profile"], @"enabledApps": apps.array };
+    NSDictionary *value = @{ @"schema": @2, @"enabled": current[@"enabled"], @"profile": current[@"profile"], @"generatedProfile": current[@"generatedProfile"], @"enabledApps": apps.array };
     NSData *data = [NSPropertyListSerialization dataWithPropertyList:value format:NSPropertyListBinaryFormat_v1_0 options:0 error:error];
     if (!data || ![data writeToFile:H2ConfigPath options:NSDataWritingAtomic error:error]) return NO;
     notify_post(H2ConfigChangedNotification.UTF8String);
@@ -122,11 +163,7 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
     int token = [self runtimeTokenForBundleID:bundleID];
     if (token < 0) return;
     BOOL active = [config[@"enabled"] boolValue] && [config[@"enabledApps"] containsObject:bundleID];
-    NSString *profile = config[@"profile"];
-    uint64_t profileCode = 0;
-    NSArray *profiles = [H2ConfigManager profiles];
-    for (NSUInteger i = 0; i < profiles.count; i++) if ([profiles[i][@"name"] isEqualToString:profile]) { profileCode = i; break; }
-    uint64_t state = H2RuntimeMagic | (profileCode << 8) | (active ? 1 : 0);
+    uint64_t state = H2RuntimeMagic | (active ? 1 : 0);
     notify_set_state(token, state);
     notify_post([self runtimeNameForBundleID:bundleID].UTF8String);
 }
@@ -140,16 +177,14 @@ static uint64_t const H2RuntimeMagic = 0x4832434900000000ULL;
         int token = [self runtimeTokenForBundleID:bundleID];
         uint64_t state = 0;
         if (token >= 0 && notify_get_state(token, &state) == 0 && (state & 0xffffffff00000000ULL) == H2RuntimeMagic) {
-            uint64_t code = (state >> 8) & 0xff;
-            NSArray *profiles = [H2ConfigManager profiles];
-            NSString *profile = profiles[code < profiles.count ? code : 0][@"name"];
-            return @{ @"enabled": @((state & 1) != 0), @"profile": profile };
+            NSDictionary *current = [self snapshot];
+            return @{ @"enabled": @((state & 1) != 0), @"profile": current[@"profile"], @"generatedProfile": current[@"generatedProfile"] };
         }
     }
     NSDictionary *fallback = [self snapshot];
-    if (bundleID.length == 0) return @{ @"enabled": @(NO), @"profile": fallback[@"profile"] };
+    if (bundleID.length == 0) return @{ @"enabled": @(NO), @"profile": fallback[@"profile"], @"generatedProfile": fallback[@"generatedProfile"] };
     BOOL active = [fallback[@"enabled"] boolValue] && [fallback[@"enabledApps"] containsObject:bundleID];
-    return @{ @"enabled": @(active), @"profile": fallback[@"profile"] };
+    return @{ @"enabled": @(active), @"profile": fallback[@"profile"], @"generatedProfile": fallback[@"generatedProfile"] };
 }
 
 - (void)appendLog:(NSString *)message {

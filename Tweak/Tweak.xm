@@ -67,9 +67,9 @@ static BOOL H2FakeEnabled(void) {
 
 static NSDictionary<NSString *, id> *H2Profile(void) {
     if (H2ReadingConfig) return nil;
-    NSString *name = H2StringOrEmpty(H2CurrentConfig()[@"profile"]);
-    if (!name.length) return nil;
-    NSDictionary *profile = [H2ConfigManager profileNamed:name];
+    NSDictionary *config = H2CurrentConfig();
+    NSDictionary *profile = config[@"generatedProfile"];
+    if (![profile isKindOfClass:NSDictionary.class]) profile = [H2ConfigManager profileNamed:H2StringOrEmpty(config[@"profile"])];
     return [profile isKindOfClass:NSDictionary.class] ? profile : nil;
 }
 
@@ -79,9 +79,8 @@ static NSDictionary<NSString *, id> *H2EnabledProfile(void) {
     if (H2IsExcludedBundle(bundleID)) return nil;
     NSDictionary *config = H2CurrentConfig();
     if (![config[@"enabled"] boolValue]) return nil;
-    NSString *name = H2StringOrEmpty(config[@"profile"]);
-    if (!name.length) return nil;
-    NSDictionary *profile = [H2ConfigManager profileNamed:name];
+    NSDictionary *profile = config[@"generatedProfile"];
+    if (![profile isKindOfClass:NSDictionary.class]) profile = [H2ConfigManager profileNamed:H2StringOrEmpty(config[@"profile"])];
     return [profile isKindOfClass:NSDictionary.class] ? profile : nil;
 }
 

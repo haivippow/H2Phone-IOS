@@ -69,7 +69,7 @@ final class H2Store: ObservableObject {
     func change(name: String) async {
         operation = .loading("Đang thực hiện Change…")
         do {
-            let result = try await service.change(to: name, apps: selectedApps)
+            let result = try await service.change(to: name, apps: selectedApps, settings: generationSettings)
             profiles.insert(result, at: 0)
             activeID = result.id
             operation = .success("Đã áp dụng \(result.name)")
